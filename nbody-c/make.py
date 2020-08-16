@@ -1,15 +1,15 @@
-import os
-
+from os import system, path
 from sys import argv, platform
 
 # https://benchmarksgame-team.pages.debian.net/benchmarksgame/program/nbody-gcc-8.html
 # https://benchmarksgame-team.pages.debian.net/benchmarksgame/description/nbody.html#nbody
 
-WIN = platform == "win32"
+dir_path = path.dirname(path.realpath(__file__))
+in_windows = (platform == "win32")
 
-SRC = "nbody.c"
-EXE = "nbody-c"
-EXT = ".exe" if WIN else ""
+src = path.join(dir_path, "nbody.c")
+exe = path.join(dir_path, "nbody-c")
+ext = ".exe" if in_windows else ""
 
 GCC_ARGS = [
     "-O3",
@@ -18,18 +18,18 @@ GCC_ARGS = [
     "-march=native",
     "-funroll-loops",
     "-static",
-    SRC,
+    src,
     "-o",
-    EXE + EXT,
+    exe + ext,
     "-lm"
 ]
 
 if __name__ == "__main__":
     if len(argv) == 1:
-        os.system(" ".join(["gcc"] + GCC_ARGS))
+        system(" ".join(["gcc"] + GCC_ARGS))
 
-    elif argv[1] == "time" and platform != "win32":
-        os.system(" ".join(["time", "gcc"] + GCC_ARGS))
+    elif argv[1] == "time" and not in_windows:
+        system(" ".join(["time", "gcc"] + GCC_ARGS))
 
     elif argv[1] == "clean":
-        os.system(f"rm {EXE + EXT}")
+        system(f"rm {exe + ext}")

@@ -1,14 +1,14 @@
-import os
-
+from os import system, path
 from sys import argv, platform
 
 # http://cliffle.com/p/dangerust
 
-WIN = platform == "win32"
+dir_path = path.dirname(path.realpath(__file__))
+in_windows = (platform == "win32")
 
-SRC = "nbody.rs"
-EXE = "nbody-rs"
-EXT = ".exe" if WIN else ""
+src = path.join(dir_path, "nbody.rs")
+exe = path.join(dir_path, "nbody-rs")
+ext = ".exe" if in_windows else ""
 
 RUSTC_ARGS = [
     "-C",
@@ -17,17 +17,17 @@ RUSTC_ARGS = [
     "target-cpu=native",
     "-C",
     "codegen-units=1",
-    SRC,
+    src,
     "-o",
-    EXE + EXT
+    exe + ext
 ]
 
 if __name__ == "__main__":
     if len(argv) == 1:
-        os.system(" ".join(["rustc"] + RUSTC_ARGS))
+        system(" ".join(["rustc"] + RUSTC_ARGS))
 
-    elif argv[1] == "time" and platform != "win32":
-        os.system(" ".join(["time", "rustc"] + RUSTC_ARGS))
+    elif argv[1] == "time" and not in_windows:
+        system(" ".join(["time", "rustc"] + RUSTC_ARGS))
 
     elif argv[1] == "clean":
-        os.system(f"rm {EXE + EXT} {EXE}.pdb")
+        system(f"rm {exe + ext} {exe}.pdb")
