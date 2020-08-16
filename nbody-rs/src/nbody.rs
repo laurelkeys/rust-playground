@@ -18,7 +18,7 @@ struct body {
 }
 
 const SOLAR_MASS: f64 = 4.0 * PI * PI;
-const DAYS_PER_YEAR: f64 = 356.24;
+const DAYS_PER_YEAR: f64 = 365.24;
 const BODIES_COUNT: usize = 5;
 
 static mut solar_Bodies: [body; BODIES_COUNT] = [
