@@ -4,10 +4,6 @@
     non_upper_case_globals,
     non_camel_case_types,
     non_snake_case,
-
-    // @Temporary:
-    unused_imports,
-    dead_code,
 )]
 
 use std::arch::x86_64::*;
@@ -246,7 +242,20 @@ unsafe fn advance(bodies: *mut body) {
 }
 
 fn main() {
-    println!("Hello, world!");
+    unsafe {
+        offset_Momentum(solar_Bodies.as_mut_ptr());
+        output_Energy(solar_Bodies.as_mut_ptr());
 
-    // @Todo: ...
+        let n = std::env::args()
+            .nth(1)
+            .unwrap()
+            .parse()
+            .unwrap();
+
+        for _ in 0..n {
+            advance(solar_Bodies.as_mut_ptr())
+        }
+
+        output_Energy(solar_Bodies.as_mut_ptr());
+    }
 }
