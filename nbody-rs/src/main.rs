@@ -20,7 +20,7 @@ const SOLAR_MASS: f64 = 4.0 * PI * PI;
 const DAYS_PER_YEAR: f64 = 365.24;
 const BODIES_COUNT: usize = 5;
 
-static mut solar_Bodies: [body; BODIES_COUNT] = [
+const STARTING_STATE: [body; BODIES_COUNT] = [
     /* Sun */ body {
         mass: SOLAR_MASS,
         position: [0.0; 3],
@@ -84,6 +84,129 @@ static mut solar_Bodies: [body; BODIES_COUNT] = [
     },
 ];
 
+const INTERACTIONS_COUNT: usize = BODIES_COUNT * (BODIES_COUNT - 1) / 2;
+const ROUNDED_INTERACTIONS_COUNT: usize = INTERACTIONS_COUNT + INTERACTIONS_COUNT % 2;
+
+#[derive(Copy, Clone)]
+#[repr(C)]
+union Interactions {
+    scalars: [f64; ROUNDED_INTERACTIONS_COUNT],
+    vectors: [__m128d; ROUNDED_INTERACTIONS_COUNT / 2],
+}
+
+impl Interactions {
+    // @Safety: The in-memory representation of `f64` and `__m128d` is
+    // compatible, so accesses to the union members is safe in any order.
+
+    /// Returns a reference to the storage as `f64`s.
+    pub fn as_scalars(&mut self) -> &mut [f64; ROUNDED_INTERACTIONS_COUNT] {
+        unsafe { &mut self.scalars }
+    }
+
+    /// Returns a reference to the storage as `__m128d`s.
+    pub fn as_vectors(&mut self) -> &mut [__m128d; ROUNDED_INTERACTIONS_COUNT / 2] {
+        unsafe { &mut self.vectors }
+    }
+}
+
+/// Advance all the bodies in the system by one timestep.
+/// Calculate the interactions between all the bodies, update each body's
+/// velocity based on those interactions, and update each body's position
+/// by the distance it travels in a timestep at it's updated velocity.
+#[cfg(target_feature = "sse2")]
+fn advance(
+    bodies: &mut [body; BODIES_COUNT],
+    position_Deltas: &mut [Interactions; 3],
+    magnitudes: &mut Interactions,
+) {
+    // @Safety: This code is only compiled for processors that support SSE2,
+    // so the SIMD operations used here are safe.
+
+    // Calculate the position_Deltas between the bodies for each interaction.
+    {
+        let mut k = 0;
+        for i in 0..(BODIES_COUNT - 1) {
+            for j in (i + 1)..BODIES_COUNT {
+                for m in 0..3 {
+                    position_Deltas[m].as_scalars()[k] = bodies[i].position[m] - bodies[j].position[m];
+                }
+
+                k += 1;
+            }
+        }
+    }
+
+    // Calculate the magnitudes of force between the bodies for each interaction.
+    // @Note: This loop processes two interactions at a time,
+    // which is why ROUNDED_INTERACTIONS_COUNT / 2 iterations are done.
+    for i in 0..(ROUNDED_INTERACTIONS_COUNT / 2) {
+        // Load position_Deltas of two bodies into position_Delta.
+        let mut position_Delta = [unsafe { _mm_setzero_pd() }; 3];
+        for m in 0..3 {
+            position_Delta[m] = position_Deltas[m].as_vectors()[i];
+        }
+
+        let distance_Squared: __m128d = unsafe {
+            _mm_add_pd(                                                 // = ((position_Delta[0] * position_Delta[0])
+                _mm_add_pd(                                             //     + (position_Delta[1] * position_Delta[1]))
+                    _mm_mul_pd(position_Delta[0], position_Delta[0]),   //     + (position_Delta[2] * position_Delta[2])
+                    _mm_mul_pd(position_Delta[1], position_Delta[1])),  //
+                _mm_mul_pd(position_Delta[2], position_Delta[2]))       //
+        };
+
+        // @Todo: Add explanation.
+        let mut distance_Reciprocal: __m128d = unsafe {
+            _mm_cvtps_pd(_mm_rsqrt_ps(_mm_cvtpd_ps(distance_Squared)))  // ~= pow(distance_Squared, -0.5)
+        };
+
+        for _ in 0..2 {
+            // @Todo: Add explanation.
+            distance_Reciprocal = unsafe {
+                _mm_sub_pd(                                                     // = (distance_Reciprocal * 1.5)
+                    _mm_mul_pd(distance_Reciprocal, _mm_set1_pd(1.5)),          //     - ((0.5 * distance_Squared * distance_Reciprocal)
+                    _mm_mul_pd(                                                 //         * (distance_Reciprocal * distance_Reciprocal))
+                        _mm_mul_pd(                                             //
+                            _mm_mul_pd(_mm_set1_pd(0.5), distance_Squared),     //
+                            distance_Reciprocal),                               //
+                        _mm_mul_pd(distance_Reciprocal, distance_Reciprocal)))  //
+            };
+        }
+
+        // @Todo: Add explanation.
+        magnitudes.as_vectors()[i] = unsafe {
+            _mm_mul_pd(                                           // = (0.01 / distance_Squared) * distance_Reciprocal
+                _mm_div_pd(_mm_set1_pd(0.01), distance_Squared),  //
+                distance_Reciprocal)                              //
+        };
+
+    }
+
+    // Use the calculated magnitudes of force to update the bodies' velocities.
+    {
+        let mut k = 0;
+        for i in 0..(BODIES_COUNT - 1) {
+            for j in (i + 1)..BODIES_COUNT {
+                let i_mass_magnitude = bodies[i].mass * magnitudes.as_scalars()[k];
+                let j_mass_magnitude = bodies[j].mass * magnitudes.as_scalars()[k];
+
+                for m in 0..3 {
+                    bodies[i].velocity[m] -= position_Deltas[m].as_scalars()[k] * j_mass_magnitude;
+                    bodies[j].velocity[m] += position_Deltas[m].as_scalars()[k] * i_mass_magnitude;
+                }
+
+                k += 1;
+            }
+        }
+    }
+
+    // Use the updated velocities to update the positions for all of the bodies.
+    for i in 0..BODIES_COUNT {
+        for m in 0..3 {
+            bodies[i].position[m] += 0.01 * bodies[i].velocity[m];
+        }
+    }
+}
+
 /// Calculate the momentum of each body and conserve momentum of the system
 /// by adding to the Sun's velocity the appropriate opposite velocity needed
 /// in order to offset that body's momentum.
@@ -127,136 +250,19 @@ fn output_Energy(bodies: &mut [body; BODIES_COUNT]) {
     println!("{:.9}", energy);
 }
 
-/// Advance all the bodies in the system by one timestep.
-/// Calculate the interactions between all the bodies, update each body's
-/// velocity based on those interactions, and update each body's position
-/// by the distance it travels in a timestep at it's updated velocity.
-unsafe fn advance(bodies: &mut [body; BODIES_COUNT]) {
-    const INTERACTIONS_COUNT: usize = BODIES_COUNT * (BODIES_COUNT - 1) / 2;
-    const ROUNDED_INTERACTIONS_COUNT: usize = INTERACTIONS_COUNT + INTERACTIONS_COUNT % 2;
+fn main() {
+    let mut solar_Bodies = STARTING_STATE;
 
-    #[derive(Copy, Clone)]
-    #[repr(C)]
-    union Interactions {
-        scalars: [f64; ROUNDED_INTERACTIONS_COUNT],
-        vectors: [__m128d; ROUNDED_INTERACTIONS_COUNT / 2],
-    }
-
-    impl Interactions {
-        /// Returns a reference to the storage as `f64`s.
-        pub fn as_scalars(&mut self) -> &mut [f64; ROUNDED_INTERACTIONS_COUNT] {
-            // @Safety: The in-memory representation of `f64` and `__m128d` is
-            // compatible, so accesses to the union members is safe in any order.
-            unsafe { &mut self.scalars }
-        }
-
-        /// Returns a reference to the storage as `__m128d`s.
-        pub fn as_vectors(&mut self) -> &mut [__m128d; ROUNDED_INTERACTIONS_COUNT / 2] {
-            // @Safety: The in-memory representation of `f64` and `__m128d` is
-            // compatible, so accesses to the union members is safe in any order.
-            unsafe { &mut self.vectors }
-        }
-    }
-
-    static mut position_Deltas: [Interactions; 3] =
+    let mut position_Deltas: [Interactions; 3] =
         [Interactions { scalars: [0.0; ROUNDED_INTERACTIONS_COUNT] }; 3];
 
-    static mut magnitudes: Interactions =
+    let mut magnitudes: Interactions =
         Interactions { scalars: [0.0; ROUNDED_INTERACTIONS_COUNT] };
 
-    // Calculate the position_Deltas between the bodies for each interaction.
-    {
-        let mut k = 0;
-        for i in 0..(BODIES_COUNT - 1) {
-            for j in (i + 1)..BODIES_COUNT {
-                for m in 0..3 {
-                    position_Deltas[m].as_scalars()[k] = bodies[i].position[m] - bodies[j].position[m];
-                }
+    offset_Momentum(&mut solar_Bodies);
+    output_Energy(&mut solar_Bodies);
 
-                k += 1;
-            }
-        }
-    }
-
-    // Calculate the magnitudes of force between the bodies for each interaction.
-    // @Note: This loop processes two interactions at a time,
-    // which is why ROUNDED_INTERACTIONS_COUNT / 2 iterations are done.
-    for i in 0..(ROUNDED_INTERACTIONS_COUNT / 2) {
-        // Load position_Deltas of two bodies into position_Delta.
-        let mut position_Delta = [_mm_setzero_pd(); 3];
-        for m in 0..3 {
-            position_Delta[m] = position_Deltas[m].as_vectors()[i];
-        }
-
-        let distance_Squared: __m128d =                                 //
-            _mm_add_pd(                                                 // = ((position_Delta[0] * position_Delta[0])
-                _mm_add_pd(                                             //     + (position_Delta[1] * position_Delta[1]))
-                    _mm_mul_pd(position_Delta[0], position_Delta[0]),   //     + (position_Delta[2] * position_Delta[2])
-                    _mm_mul_pd(position_Delta[1], position_Delta[1])),  //
-                _mm_mul_pd(position_Delta[2], position_Delta[2]));      //
-
-        // @Todo: Add explanation.
-        let mut distance_Reciprocal: __m128d =
-        _mm_cvtps_pd(_mm_rsqrt_ps(_mm_cvtpd_ps(distance_Squared)));
-
-        for _ in 0..2 {
-            // @Todo: Add explanation.
-            distance_Reciprocal =                                                //
-                _mm_sub_pd(                                                      // = (distance_Reciprocal * 1.5)
-                    _mm_mul_pd(distance_Reciprocal, _mm_set1_pd(1.5)),           //     - ((0.5 * distance_Squared * distance_Reciprocal)
-                    _mm_mul_pd(                                                  //         * (distance_Reciprocal * distance_Reciprocal))
-                        _mm_mul_pd(                                              //
-                            _mm_mul_pd(_mm_set1_pd(0.5), distance_Squared),      //
-                            distance_Reciprocal),                                //
-                        _mm_mul_pd(distance_Reciprocal, distance_Reciprocal)));  //
-        }
-
-        // @Todo: Add explanation.
-        magnitudes.as_vectors()[i] =                              //
-            _mm_mul_pd(                                           // = (0.01 / distance_Squared) * distance_Reciprocal
-                _mm_div_pd(_mm_set1_pd(0.01), distance_Squared),  //
-                distance_Reciprocal);                             //
-
-    }
-
-    // Use the calculated magnitudes of force to update the bodies' velocities.
-    {
-        let mut k = 0;
-        for i in 0..(BODIES_COUNT - 1) {
-            for j in (i + 1)..BODIES_COUNT {
-                let i_mass_magnitude = bodies[i].mass * magnitudes.as_scalars()[k];
-                let j_mass_magnitude = bodies[j].mass * magnitudes.as_scalars()[k];
-
-                for m in 0..3 {
-                    bodies[i].velocity[m] -= position_Deltas[m].as_scalars()[k] * j_mass_magnitude;
-                    bodies[j].velocity[m] += position_Deltas[m].as_scalars()[k] * i_mass_magnitude;
-                }
-
-                k += 1;
-            }
-        }
-    }
-
-    // Use the updated velocities to update the positions for all of the bodies.
-    for i in 0..BODIES_COUNT {
-        for m in 0..3 {
-            bodies[i].position[m] += 0.01 * bodies[i].velocity[m];
-        }
-    }
-}
-
-fn main() {
-    unsafe {
-        offset_Momentum(&mut solar_Bodies);
-        output_Energy(&mut solar_Bodies);
-
-        let n = std::env::args()
-            .nth(1)
-            .unwrap()
-            .parse()
-            .unwrap();
-
-        for _ in 0..n { advance(&mut solar_Bodies) }
-        output_Energy(&mut solar_Bodies);
-    }
+    let n = std::env::args().nth(1).unwrap().parse().unwrap();
+    for _ in 0..n { advance(&mut solar_Bodies, &mut position_Deltas, &mut magnitudes) }
+    output_Energy(&mut solar_Bodies);
 }
