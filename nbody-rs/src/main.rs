@@ -84,9 +84,17 @@ const STARTING_STATE: [body; BODIES_COUNT] = [
     },
 ];
 
+// Total number of different interactions between each body and every other body.
 const INTERACTIONS_COUNT: usize = BODIES_COUNT * (BODIES_COUNT - 1) / 2;
+
+// @Note: Some of the calculations will be computed two at a time by using x86 SSE
+// instructions, so it will be useful to have a `ROUNDED_INTERACTIONS_COUNT` which
+// is the smallest even number which is equal to or greater than `INTERACTIONS_COUNT`.
 const ROUNDED_INTERACTIONS_COUNT: usize = INTERACTIONS_COUNT + INTERACTIONS_COUNT % 2;
 
+// @Note: Both of these arrays are set to contain `ROUNDED_INTERACTIONS_COUNT`
+// elements to simplify one of the following loops, and to also keep the
+// second and third arrays in `position_Deltas` aligned properly.
 #[derive(Copy, Clone)]
 #[repr(C)]
 union Interactions {
@@ -138,14 +146,17 @@ fn advance(
 
     // Calculate the magnitudes of force between the bodies for each interaction.
     // @Note: This loop processes two interactions at a time,
-    // which is why ROUNDED_INTERACTIONS_COUNT / 2 iterations are done.
+    // which is why `ROUNDED_INTERACTIONS_COUNT / 2` iterations are done.
     for i in 0..(ROUNDED_INTERACTIONS_COUNT / 2) {
-        // Load position_Deltas of two bodies into position_Delta.
+        // Load `position_Deltas` of two bodies into `position_Delta`.
         let mut position_Delta = [unsafe { _mm_setzero_pd() }; 3];
         for m in 0..3 {
             position_Delta[m] = position_Deltas[m].as_vectors()[i];
         }
 
+        // @Note: Doing square roots using double precision floating point math can be
+        // quite time consuming, so SSE's much faster single precision reciprocal square root
+        // approximation instruction is used as a starting point instead.
         let distance_Squared: __m128d = unsafe {
             _mm_add_pd(                                                 // = ((position_Delta[0] * position_Delta[0])
                 _mm_add_pd(                                             //     + (position_Delta[1] * position_Delta[1]))
@@ -154,13 +165,13 @@ fn advance(
                 _mm_mul_pd(position_Delta[2], position_Delta[2]))       //
         };
 
-        // @Todo: Add explanation.
+        // @Note: Since the precision isn't quite sufficient to get acceptable results,
+        // so two iterations of the Newton–Raphson method are done to improve it further.
         let mut distance_Reciprocal: __m128d = unsafe {
             _mm_cvtps_pd(_mm_rsqrt_ps(_mm_cvtpd_ps(distance_Squared)))  // ~= pow(distance_Squared, -0.5)
         };
 
         for _ in 0..2 {
-            // @Todo: Add explanation.
             distance_Reciprocal = unsafe {
                 _mm_sub_pd(                                                     // = (distance_Reciprocal * 1.5)
                     _mm_mul_pd(distance_Reciprocal, _mm_set1_pd(1.5)),          //     - ((0.5 * distance_Squared * distance_Reciprocal)
@@ -172,7 +183,7 @@ fn advance(
             };
         }
 
-        // @Todo: Add explanation.
+        // Calculate the magnitudes of force between the bodies.
         magnitudes.as_vectors()[i] = unsafe {
             _mm_mul_pd(                                           // = (0.01 / distance_Squared) * distance_Reciprocal
                 _mm_div_pd(_mm_set1_pd(0.01), distance_Squared),  //
@@ -253,11 +264,16 @@ fn output_Energy(bodies: &mut [body; BODIES_COUNT]) {
 fn main() {
     let mut solar_Bodies = STARTING_STATE;
 
-    let mut position_Deltas: [Interactions; 3] =
-        [Interactions { scalars: [0.0; ROUNDED_INTERACTIONS_COUNT] }; 3];
-
+    // @Note: It's useful to have two arrays to keep track of the position deltas
+    // and magnitudes of force between the bodies for each interaction.
     let mut magnitudes: Interactions =
         Interactions { scalars: [0.0; ROUNDED_INTERACTIONS_COUNT] };
+
+    // @Note: For the `position_Deltas` array, instead of using a 1-D array of structures
+    // (each containing X, Y, Z components), a 2-D array is used, consisting of three arrays
+    // that each contain all of the X, Y, Z components for all the position deltas.
+    let mut position_Deltas: [Interactions; 3] =
+        [Interactions { scalars: [0.0; ROUNDED_INTERACTIONS_COUNT] }; 3];
 
     offset_Momentum(&mut solar_Bodies);
     output_Energy(&mut solar_Bodies);
