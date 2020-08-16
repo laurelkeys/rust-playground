@@ -6,7 +6,7 @@ from sys import argv, platform
 dir_path = path.dirname(path.realpath(__file__))
 in_windows = (platform == "win32")
 
-src = path.join(dir_path, "nbody.rs")
+src = path.join(dir_path, "main.rs")
 exe = path.join(dir_path, "nbody-rs")
 ext = ".exe" if in_windows else ""
 
