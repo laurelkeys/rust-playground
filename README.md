@@ -5,13 +5,13 @@ Following [Cliff L. Biffle](http://cliffle.com/about/)'s `unsafe`-first approach
 ```bash
 .
 ├── nbody-c/
-│   ├── nbody.c         # reference C code, unchanged
-│   └── make.py         # build script
+│   └── main.c          # reference C code, unchanged
 │
-└── nbody-rs/
-    ├── src/
-    │   ├── nbody.rs    # Rust code, following LRtDW
-    │   └── make.py     # build script
-    ├── Cargo.lock
-    └── Cargo.toml
+├── nbody-rs/
+│   ├── src/
+│   │   └── main.rs     # Rust code, following LRtDW
+│   ├── Cargo.lock
+│   └── Cargo.toml
+│
+└ make.py               # build script
 ```
