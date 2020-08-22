@@ -2,6 +2,15 @@
 
 use std::rc::Rc; // @Note: 'Rc' stands for 'Reference Counted'
 
+// @Note: a type is 'Send' if it's safe to move to another thread.
+// A type is 'Sync' if it's safe to share between multiple threads.
+// Thus, if `T` is 'Sync' then `&T` is 'Send'.
+//
+// 'Rc' is *not* thread-safe since it doesn't modify its reference
+// counts atomically (for this, look into 'std::sync::Arc').
+//
+// See https://rust-unofficial.github.io/too-many-lists/third-arc.html
+
 pub struct List<T> {
     head: Link<T>,
 }
@@ -35,6 +44,24 @@ impl<T> List<T> {
 
     pub fn head(&self) -> Option<&T> {
         self.head.as_ref().map(|node| &node.elem)
+    }
+}
+
+//
+// Drop trait.
+//
+
+impl<T> Drop for List<T> {
+    fn drop(&mut self) {
+        let mut head = self.head.take();
+
+        while let Some(node) = head {
+            if let Ok(mut node) = Rc::try_unwrap(node) {
+                head = node.next.take();
+            } else {
+                break;
+            }
+        }
     }
 }
 
@@ -94,7 +121,7 @@ mod test {
         let list = list.tail();
         assert_eq!(list.head(), None);
 
-        // Make sure empty tail works
+        // Make sure empty tail works.
         let list = list.tail();
         assert_eq!(list.head(), None);
     }
