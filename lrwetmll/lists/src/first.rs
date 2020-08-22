@@ -1,3 +1,5 @@
+// https://rust-unofficial.github.io/too-many-lists/first.html
+
 use std::mem;
 
 pub struct List {

@@ -2,8 +2,8 @@
 
 Trying out this Rust thing... let's see how it goes 🦀
 
-## [`lrtdw/`](lrtdw)
-Following [Cliff L. Biffle](http://cliffle.com/about/)'s `unsafe`-first approach to "Learn Rust the Dangerous Way" ([LRtDW](http://cliffle.com/p/dangerust/)) series of articles.
+## `lrtdw/`
+Following [Cliff L. Biffle](http://cliffle.com/about/)'s `unsafe`-first approach to "[Learn Rust the Dangerous Way](http://cliffle.com/p/dangerust/)" (LRtDW) series of articles.
 
 ```bash
 .
@@ -18,15 +18,15 @@ Following [Cliff L. Biffle](http://cliffle.com/about/)'s `unsafe`-first approach
 └ make.py               # build script
 ```
 
-## [`lrwetmll/`](lrwetmll)
-Following "[Learn Rust With Entirely Too Many Linked Lists](https://rust-unofficial.github.io/too-many-lists/)" chapters.
+## `lrwetmll/`
+Following "[Learn Rust With Entirely Too Many Linked Lists](https://rust-unofficial.github.io/too-many-lists/)" chapters. 🚧 WIP 🚧
 
 ```bash
 .
 └── lists/
     ├── src/
-    │   ├── first.rs    # ch. 1
-    │   ├── second.rs   # ch. 2
+    │   ├── first.rs    # a bad singly-linked stack
+    │   ├── second.rs   # an ok singly-linked stack
     │   └── lib.rs
     └── Cargo.toml
 ```

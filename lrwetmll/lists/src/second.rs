@@ -1,3 +1,5 @@
+// https://rust-unofficial.github.io/too-many-lists/second.html
+
 pub struct List<T> {
     head: Link<T>,
 }
