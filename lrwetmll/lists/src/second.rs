@@ -61,7 +61,7 @@ impl<T> Drop for List<T> {
 
 // @Note: there are 3 kinds of iterator:
 //  * IntoIter - `T`        owned data (value)
-//  * IterMut - `&mut T`    mutably borrowed data (unique reference)
+//  * IterMut - `&mut T`    mutably borrowed data (exclusive reference)
 //  * Iter - `&T`           immutably borrowed data (shared reference)
 //
 // See https://rust-lang.github.io/api-guidelines/naming.html (C-ITER)
