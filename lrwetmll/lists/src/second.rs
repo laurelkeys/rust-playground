@@ -60,9 +60,11 @@ impl<T> Drop for List<T> {
 //
 
 // @Note: there are 3 kinds of iterator:
-//  * IntoIter - `T`
-//  * IterMut - `&mut T`
-//  * Iter - `&T`
+//  * IntoIter - `T`        owned data (value)
+//  * IterMut - `&mut T`    mutably borrowed data (unique reference)
+//  * Iter - `&T`           immutably borrowed data (shared reference)
+//
+// See https://rust-lang.github.io/api-guidelines/naming.html (C-ITER)
 
 // IntoIter - `T`
 
@@ -76,6 +78,7 @@ impl<T> List<T> {
 
 impl<T> Iterator for IntoIter<T> {
     type Item = T;
+
     fn next(&mut self) -> Option<Self::Item> {
         self.0.pop()
     }
@@ -112,12 +115,19 @@ impl<T> List<T> {
 
 impl<'a, T> Iterator for Iter<'a, T> {
     type Item = &'a T;
+
+    // @Note: the signature can be "desugarred" as shown below,
+    // meaning that, there are no lifetime constraints between
+    // the input and the output for the `next` function:
+    //  |
+    //  |   fn next<'b>(&'b mut self) -> Option<&'a T> {
+    //
     fn next(&mut self) -> Option<Self::Item> {
         self.next.map(|node| {
             self.next = node.next.as_ref().map(|node| &**node);
             &node.elem
         })
-        // @Note: same as above, this would let us get rid of the `**` dereferencing
+        // @Note: same as for `iter` above, this would let us omit the `**` dereferencing:
         //  |
         //  |   self.next.map(|node| {
         //  |       self.next = node.next.as_ref().map::<&Node<T>, _>(|node| &node);
@@ -128,7 +138,29 @@ impl<'a, T> Iterator for Iter<'a, T> {
 }
 
 // IterMut - `&mut T`
-// @Todo: https://rust-unofficial.github.io/too-many-lists/second-iter-mut.html
+
+pub struct IterMut<'a, T> {
+    next: Option<&'a mut Node<T>>,
+}
+
+impl<T> List<T> {
+    pub fn iter_mut(&mut self) -> IterMut<'_, T> {
+        IterMut {
+            next: self.head.as_mut().map(|node| &mut **node),
+        }
+    }
+}
+
+impl<'a, T> Iterator for IterMut<'a, T> {
+    type Item = &'a mut T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.next.take().map(|node| {
+            self.next = node.next.as_mut().map(|node| &mut **node);
+            &mut node.elem
+        })
+    }
+}
 
 //
 // Test functions.
@@ -210,5 +242,20 @@ mod test {
         assert_eq!(iter.next(), Some(&3));
         assert_eq!(iter.next(), Some(&2));
         assert_eq!(iter.next(), Some(&1));
+    }
+
+    #[test]
+    fn iter_mut() {
+        let mut list = List::new();
+
+        list.push(1);
+        list.push(2);
+        list.push(3);
+
+        let mut iter = list.iter_mut();
+
+        assert_eq!(iter.next(), Some(&mut 3));
+        assert_eq!(iter.next(), Some(&mut 2));
+        assert_eq!(iter.next(), Some(&mut 1));
     }
 }

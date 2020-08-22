@@ -25,8 +25,8 @@ Following "[Learn Rust With Entirely Too Many Linked Lists](https://rust-unoffic
 .
 └── lists/
     ├── src/
-    │   ├── first.rs    # a bad singly-linked stack
-    │   ├── second.rs   # an ok singly-linked stack
+    │   ├── first.rs    # ch. 2, a bad singly-linked stack
+    │   ├── second.rs   # ch. 3, an ok singly-linked stack
     │   └── lib.rs
     └── Cargo.toml
 ```
