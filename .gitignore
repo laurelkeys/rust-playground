@@ -1,3 +1,9 @@
-*.exe
+# VS Code
 .vscode/
-nbody-rs/target/
+
+# Executables
+*.exe
+
+# Rust
+target/
+Cargo.lock
