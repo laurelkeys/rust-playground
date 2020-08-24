@@ -144,6 +144,36 @@ impl<T> Drop for List<T> {
 }
 
 //
+// Iterator trait.
+//
+
+pub struct IntoIter<T>(List<T>);
+
+impl<T> List<T> {
+    pub fn into_iter(self) -> IntoIter<T> {
+        IntoIter(self)
+    }
+}
+
+impl<T> Iterator for IntoIter<T> {
+    type Item = T;
+
+    fn next(&mut self) -> Option<T> {
+        self.0.pop_front()
+    }
+}
+
+impl<T> DoubleEndedIterator for IntoIter<T> {
+    fn next_back(&mut self) -> Option<T> {
+        self.0.pop_back()
+    }
+}
+
+// @Note: we've only implemented `IntoIter`, not `Iter` and `IterMut`.
+//
+// See https://rust-unofficial.github.io/too-many-lists/fourth-iteration.html#iter
+
+//
 // Test functions.
 //
 
@@ -215,7 +245,7 @@ mod test {
         // the tests pass, it wouldn't be asserting whether or not the references
         // we get are mutable (exclusive) or shared.
         //
-        // We can see this by noting that, while the following would all pass
+        // We can see this by noting that, while all the following would pass
         // for `peek_front_mut()`, or `peek_back_mut()`:
         //  |
         //  | assert_eq!(&mut *list.peek_front_mut().unwrap(), &mut 3);
@@ -231,5 +261,22 @@ mod test {
         //  |
         //  | assert_eq!(&mut *list.peek_front().unwrap(), &mut 3);
         //
+    }
+
+    #[test]
+    fn into_iter() {
+        let mut list = List::new();
+
+        list.push_front(1);
+        list.push_front(2);
+        list.push_front(3);
+
+        let mut iter = list.into_iter();
+
+        assert_eq!(iter.next(), Some(3));
+        assert_eq!(iter.next_back(), Some(1));
+        assert_eq!(iter.next(), Some(2));
+        assert_eq!(iter.next_back(), None);
+        assert_eq!(iter.next(), None);
     }
 }
