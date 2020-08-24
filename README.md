@@ -19,7 +19,7 @@ Following [Cliff L. Biffle](http://cliffle.com/about/)'s `unsafe`-first approach
 ```
 
 ## `lrwetmll/`
-Following "[Learn Rust With Entirely Too Many Linked Lists](https://rust-unofficial.github.io/too-many-lists/)" chapters. 🚧 WIP 🚧
+Following "[Learn Rust With Entirely Too Many Linked Lists](https://rust-unofficial.github.io/too-many-lists/)" chapters.
 
 ```bash
 .
