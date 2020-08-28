@@ -5,7 +5,7 @@
 ## Functions
 * The `::` syntax in `::new` indicates that `new` is an *associated function* of the `String` type:
   ```rust
-      String::new()
+    String::new()
   ```
 * An *associated function* is implemented on a type, rather than on a particular instance of the type. Some languages call this a *static method* [[ch02-00](https://doc.rust-lang.org/book/ch02-00-guessing-game-tutorial.html#storing-values-with-variables)]
 * Function bodies are made up of a series of *statements* optionally ending in an *expression* [[ch03-03](https://doc.rust-lang.org/book/ch03-03-how-functions-work.html#function-bodies-contain-statements-and-expressions)]
@@ -29,8 +29,33 @@
 * *Arrays* have fixed length but all its elements must have the same type, they're useful to allocate data on the stack or to ensure that you always have a fixed number of elements [[ch03-02](https://doc.rust-lang.org/book/ch03-02-data-types.html#the-array-type)]
 * Rust checks for (and *panics* on) out of bounds indices for arrays [[ch03-02](https://doc.rust-lang.org/book/ch03-02-data-types.html#invalid-array-element-access)]
 
+## Control Flow
+* A `loop` block can return a value by placing it after a `break` expression [[ch03-05](https://doc.rust-lang.org/book/ch03-05-control-flow.html#returning-values-from-loops)]:
+  ```rust
+    let mut counter = 0;
+    let result = loop {
+        counter += 1;
+        if counter == 10 {
+            break counter * 2;
+        }
+    };
+  ```
+* Simple `for` loop examples [[ch03-05](https://doc.rust-lang.org/book/ch03-05-control-flow.html#looping-through-a-collection-with-for)]:
+  ```rust
+    let a = [10, 20, 30, 40, 50];
+    for element in a.iter() {
+        println!("the value is: {}", element);
+    }
+
+    // (1..4) is a `Range`, and `rev` reverses it
+    for number in (1..4).rev() {
+        println!("{}!", number);
+    }
+  ```
+
+## Ownership
 
 <!--
     Next chapter to read:
-    https://doc.rust-lang.org/book/ch03-05-control-flow.html
+    https://doc.rust-lang.org/book/ch04-01-what-is-ownership.html
  -->

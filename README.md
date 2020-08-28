@@ -3,7 +3,7 @@
 Trying out this Rust thing... let's see how it goes 🦀
 
 ## `book/`
-Notes reading "[the book](https://doc.rust-lang.org/book/)". 🚧 WIP 🚧
+Notes on [_the book_](https://doc.rust-lang.org/book/) "The Rust Programming Language". 🚧 WIP 🚧
 
 ## `lrtdw/`
 Following [Cliff L. Biffle](http://cliffle.com/about/)'s `unsafe`-first approach to "[Learn Rust the Dangerous Way](http://cliffle.com/p/dangerust/)" (LRtDW) series of articles.
