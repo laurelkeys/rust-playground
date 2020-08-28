@@ -1,9 +1,15 @@
 # VS Code
 .vscode/
+*.code-workspace
 
 # Executables
 *.exe
 
+# Debugging
+*.pdb
+
 # Rust
 target/
 Cargo.lock
+
+# Miscellaneous
