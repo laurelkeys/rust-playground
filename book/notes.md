@@ -10,7 +10,7 @@
 * An *associated function* is implemented on a type, rather than on a particular instance of the type. Some languages call this a *static method* [[ch02-00](https://doc.rust-lang.org/book/ch02-00-guessing-game-tutorial.html#storing-values-with-variables)] [[ch05-05](https://doc.rust-lang.org/book/ch05-03-method-syntax.html#associated-functions)]
 * Function bodies are made up of a series of *statements* optionally ending in an *expression* [[ch03-03](https://doc.rust-lang.org/book/ch03-03-how-functions-work.html#function-bodies-contain-statements-and-expressions)]
 * *Statements* are instructions that perform some action and do not return a value. *Expressions* evaluate to a resulting value
-* Expressions do not include ending semicolons. If you add a semicolon to the end of an expression, you turn it into a statement, which will then not return a value.
+* Expressions do not include ending semicolons. If you add a semicolon to the end of an expression, you turn it into a statement, which will then not return a value
 * Passing a variable to a function will move or copy, just as assignment does [[ch04-01](https://doc.rust-lang.org/book/ch04-01-what-is-ownership.html#ownership-and-functions)]
 
 ## Methods
@@ -23,6 +23,35 @@
 
 ## Enums
 * The values of an enum(eration) are called *variants* [[ch02-00](https://doc.rust-lang.org/book/ch02-00-guessing-game-tutorial.html)]
+* Each variant can have different types and amounts of associated data. For instance, the following:
+  ```rust
+    enum IpAddr {
+        V4(String),
+        V6(String),
+    }
+
+    let home = IpAddr::V4(String::from("127.0.0.1"));
+    let loopback = IpAddr::V6(String::from("::1"));
+  ```
+  Could be rewritten as [[ch06-01](https://doc.rust-lang.org/book/ch06-01-defining-an-enum.html#enum-values)]:
+  ```rust
+    enum IpAddr {
+        V4(u8, u8, u8, u8),
+        V6(String),
+    }
+
+    let home = IpAddr::V4(127, 0, 0, 1);
+    let loopback = IpAddr::V6(String::from("::1"));
+  ```
+* Enum example with a wide variety of types embedded in its variants:
+  ```rust
+    enum Message {
+        Quit, // has no data associated with it at all
+        Move { x: i32, y: i32 }, // includes an anonymous struct inside it
+        Write(String), // includes a single `String`
+        ChangeColor(i32, i32, i32), // includes three `i32` values
+    }
+  ```
 
 ## Structs
 * To create a new instance of a struct that uses most of an old instance's values we can use the *struct update syntax* [[ch05-01](https://doc.rust-lang.org/book/ch05-01-defining-structs.html#creating-instances-from-other-instances-with-struct-update-syntax)]:
@@ -99,7 +128,7 @@
     let s1 = String::from("hello");
     let s2 = s1; // `s1` was moved into `s2`
   ```
-* Rust will never automatically create "deep" copies of your data. Therefore, any *automatic* copying can be assumed to be inexpensive in terms of runtime performance.
+* Rust will never automatically create "deep" copies of your data. Therefore, any *automatic* copying can be assumed to be inexpensive in terms of runtime performance
 * If we *do* want to deeply copy the heap data of the `String`, not just the stack data, we can use a common method called `clone`:
   ```rust
     let s1 = String::from("hello");
@@ -112,10 +141,10 @@
   ```
   Rust has a special annotation called the `Copy` trait that we can place on types like integers that are stored on the stack.
 * Rust won't let us annotate a type with the `Copy` trait if the type, or any of its parts, has implemented the Drop trait. If the type needs something special to happen when the value goes out of scope and we add the `Copy` annotation to that type, we'll get a compile-time error.
-* As a general rule, any group of simple scalar values can be `Copy`, and nothing that requires allocation or is some form of resource is `Copy`.
+* As a general rule, any group of simple scalar values can be `Copy`, and nothing that requires allocation or is some form of resource is `Copy`
 * We call having references as function parameters *borrowing* [[ch04-02](https://doc.rust-lang.org/book/ch04-02-references-and-borrowing.html#references-and-borrowing)]
-* *Mutable references* (`&mut`) have one big restriction: you can have only one mutable reference to a particular piece of data in a particular scope, and you *also* cannot have a mutable reference while there is an immutable one in scope [[ch04-02](https://doc.rust-lang.org/book/ch04-02-references-and-borrowing.html#mutable-references)].
-  * Because of this, data races can be prevented at compile-time.
+* *Mutable references* (`&mut`) have one big restriction: you can have only one mutable reference to a particular piece of data in a particular scope, and you *also* cannot have a mutable reference while there is an immutable one in scope [[ch04-02](https://doc.rust-lang.org/book/ch04-02-references-and-borrowing.html#mutable-references)]
+  * Because of this, data races can be prevented at compile-time
 * A reference's scope starts from where it is introduced and continues through the last time that reference is used. As such, the following works because the last usage of the immutable references occurs before the mutable reference is introduced:
   ```rust
     let mut s = String::from("hello");
@@ -129,7 +158,56 @@
     println!("{}", r3);
   ```
 
+## Module System
+* The idiomatic way of bringing a function into scope with `use` is to keep its parent, so that we have to specify the parent module when calling the function. This makes it clear that the function isn't locally defined while still minimizing repetition of the full path [[ch07-04](https://doc.rust-lang.org/book/ch07-04-bringing-paths-into-scope-with-the-use-keyword.html#creating-idiomatic-use-paths)]:
+  ```rust
+    mod front_of_house {
+        pub mod hosting {
+            pub fn add_to_waitlist() {}
+        }
+    }
+
+    // Idiomatic way:
+    use self::front_of_house::hosting;
+    pub fn eat_at_restaurant() {
+        hosting::add_to_waitlist();
+        // ...
+    }
+
+    // Also valid, but not preferred:
+    use crate::front_of_house::hosting::add_to_waitlist;
+    pub fn eat_at_restaurant() {
+        add_to_waitlist();
+        // ...
+    }
+  ```
+ * On the other hand, when bringing in structs, enums, and other items with `use`, it's idiomatic to specify the full path:
+  ```rust
+    use std::collections::HashMap;
+    fn main() {
+        let mut map = HashMap::new();
+        map.insert(1, 2);
+    }
+  ```
+* When bringing two items with the same name into scope we can either add their parents in the `use` statement:
+  ```rust
+    use std::fmt;
+    use std::io;
+
+    fn function1() -> fmt::Result { /* ... */ }
+    fn function2() -> io::Result<()> { /* ... */ }
+  ```
+  Or create a new local name, or alias, for one of the types with `as`:
+  ```rust
+    use std::fmt::Result;
+    use std::io::Result as IoResult;
+
+    fn function1() -> Result { /* ... */ }
+    fn function2() -> IoResult<()> { /* ... */ }
+  ```
+ * When a name is brought into scope with `use`, the name available in the new scope is private. To enable the code that calls our code to refer to it as if it was defined in that code's scope, we can combine `pub` and `use`. This technique is called *re-exporting* [[ch07-04](https://doc.rust-lang.org/book/ch07-04-bringing-paths-into-scope-with-the-use-keyword.html#re-exporting-names-with-pub-use)]
+
 <!--
     Next chapter to read:
-    https://doc.rust-lang.org/book/ch06-01-defining-an-enum.html
+    https://doc.rust-lang.org/book/ch08-00-common-collections.html
  -->
