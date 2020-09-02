@@ -1,11 +1,28 @@
 use std::collections::HashMap;
+use std::io;
 
 fn main() {
-    let numbers = [42, 1, 36, 34, 76, 378, 43, 1, 43, 54, 2, 3, 43];
+    println!("Type a list of whitespace-separated numbers:");
 
-    println!("mean: {:?}", mean(&numbers));
-    println!("median: {:?}", median(&numbers));
-    println!("mode: {:?}", mode(&numbers));
+    let mut numbers = String::new();
+
+    io::stdin()
+        .read_line(&mut numbers)
+        .expect("Failed to read line");
+
+    let numbers: Vec<i32> = numbers
+        .split_whitespace()
+        .map(|number| {
+            number
+                .parse::<i32>()
+                .expect("Failed to convert input to integer")
+        })
+        .collect();
+
+    println!();
+    println!("Mean: {:?}", mean(&numbers));
+    println!("Median: {:?}", median(&numbers));
+    println!("Mode: {:?}", mode(&numbers));
 }
 
 /// Returns the mean of `numbers`, i.e. the average value.
@@ -37,9 +54,8 @@ fn median(numbers: &[i32]) -> Option<f32> {
     }
 }
 
-/// Returns the mode of `numbers`, i.e. the value that occurs most often.
-/// If `numbers` is empty, `None` is returned.
-fn mode(numbers: &[i32]) -> Option<i32> {
+/// Returns the mode of `numbers`, i.e. the value(s) that occurs most often.
+fn mode(numbers: &[i32]) -> Vec<i32> {
     let mut each_count = HashMap::new();
 
     for &number in numbers {
@@ -51,12 +67,32 @@ fn mode(numbers: &[i32]) -> Option<i32> {
         //
     }
 
-    // @Robustness: when several elements are equally maximum in `max_by_key`, the last one
-    // is returned. Check what is the most "consistently correct" thing to do in this case.
-    each_count
-        .into_iter()
-        .max_by_key(|&(_, count)| count)
-        .map(|(number, _)| number)
+    if let Some((_, max_count)) = each_count
+        .iter()
+        .max_by_key(|(_, &count)| count)
+    {
+        // @Note: I first tried the following, but it does not preserve
+        // the order in which elements are present in `numbers`:
+        //  |
+        //  |   each_count
+        //  |       .into_iter()
+        //  |       .filter(|&(_, count)| count == max_count)
+        //  |       .map(|(number, _)| number)
+        //  |       .collect::<Vec<i32>>()
+        //
+
+        let mut mode = numbers
+            .iter()
+            .filter(|number| each_count.get(number) == Some(max_count))
+            .copied() // @Note: without this, we'd only be able to `collect` into a Vec<&i32>
+            .collect::<Vec<i32>>();
+
+        // Remove possible duplicates.
+        mode.dedup();
+        mode
+    } else {
+        Vec::new() // `numbers` is empty
+    }
 }
 
 //
@@ -69,7 +105,10 @@ mod test {
 
     #[test]
     fn test_mean() {
-        assert_eq!(mean(&[9, 10, 12, 13, 13, 13, 15, 15, 16, 16, 18, 22, 23, 24, 24, 25]), 16.75);
+        assert_eq!(
+            mean(&[9, 10, 12, 13, 13, 13, 15, 15, 16, 16, 18, 22, 23, 24, 24, 25]),
+            16.75
+        );
         assert_eq!(mean(&[1, 2, 2, 3, 4, 7, 9]), 4.0);
         assert_eq!(mean(&[42]), 42.0);
         assert_eq!(mean(&[]), 0.0);
@@ -77,19 +116,27 @@ mod test {
 
     #[test]
     fn test_median() {
-        assert_eq!(median(&[9, 10, 12, 13, 13, 13, 15, 15, 16, 16, 18, 22, 23, 24, 24, 25]), Some(15.5));
+        assert_eq!(
+            median(&[9, 10, 12, 13, 13, 13, 15, 15, 16, 16, 18, 22, 23, 24, 24, 25]),
+            Some(15.5)
+        );
         assert_eq!(median(&[1, 2, 2, 3, 4, 7, 9]), Some(3.0));
         assert_eq!(median(&[1, 3, 3, 6, 7, 8, 9]), Some(6.0));
         assert_eq!(median(&[1, 3, 3, 4, 5, 7, 8, 9]), Some(4.5));
+        assert_eq!(median(&[1, 2, 3, 4]), Some(2.5));
         assert_eq!(median(&[42]), Some(42.0));
         assert_eq!(median(&[]), None);
     }
 
     #[test]
     fn test_mode() {
-        assert_eq!(mode(&[9, 10, 12, 13, 13, 13, 15, 15, 16, 16, 18, 22, 23, 24, 24, 25]), Some(13));
-        assert_eq!(mode(&[1, 2, 2, 3, 4, 7, 9]), Some(2));
-        assert_eq!(mode(&[1]), Some(1));
-        assert_eq!(mode(&[]), None);
+        assert_eq!(
+            mode(&[9, 10, 12, 13, 13, 13, 15, 15, 16, 16, 18, 22, 23, 24, 24, 25]),
+            vec![13]
+        );
+        assert_eq!(mode(&[1, 2, 2, 3, 4, 7, 9]), vec![2]);
+        assert_eq!(mode(&[1, 2, 3, 4]), vec![1, 2, 3, 4]);
+        assert_eq!(mode(&[1]), vec![1]);
+        assert_eq!(mode(&[]), vec![]);
     }
 }
