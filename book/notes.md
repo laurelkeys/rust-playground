@@ -328,7 +328,75 @@
     println!("{:?}", map); // prints: {"world": 2, "hello": 1, "wonderful": 1}
     ```
 
+## Traits
+* To define a function which takes some type with a given trait as a parameter we can use the `impl Trait` syntax [[ch10-02](https://doc.rust-lang.org/book/ch10-02-traits.html#traits-as-parameters)]:
+    ```rust
+    pub trait Summary {
+        fn summarize(&self) -> String;
+    }
+
+    pub fn notify(item: &impl Summary) {
+        println!("Breaking news! {}", item.summarize());
+    }
+    ```
+    The `impl Trait` syntax works for straightforward cases but is actually syntax sugar for a longer form, which is called a *trait bound*; it looks like this [[ch10-02](https://doc.rust-lang.org/book/ch10-02-traits.html#trait-bound-syntax)]:
+    ```rust
+    pub fn notify<T: Summary>(item: &T) {
+        println!("Breaking news! {}", item.summarize());
+    }
+    ```
+* To specify more than one trait bound, we can use the `+` syntax [[ch10-02](https://doc.rust-lang.org/book/ch10-02-traits.html#specifying-multiple-trait-bounds-with-the--syntax)]:
+    ```rust
+    pub fn notify(item: &(impl Summary + Display)) { /* ... */ }
+    // or
+    pub fn notify<T: Summary + Display>(item: &T) { /* ... */ }
+    ```
+* Rust also has an alternate syntax for specifying trait bounds inside a `where` clause after the function signature, so instead of writing this [[ch10-02](https://doc.rust-lang.org/book/ch10-02-traits.html#clearer-trait-bounds-with-where-clauses)]:
+    ```rust
+    fn some_function<T: Display + Clone, U: Clone + Debug>(t: &T, u: &U) -> i32 {
+    ```
+    we could write the following, which is less cluttered:
+    ```rust
+    fn some_function<T, U>(t: &T, u: &U) -> i32
+        where T: Display + Clone,
+            U: Clone + Debug
+    {
+    ```
+* By using a trait bound with an `impl` block that uses generic type parameters, we can implement methods conditionally for types that implement the specified traits [[ch10-02](https://doc.rust-lang.org/book/ch10-02-traits.html#using-trait-bounds-to-conditionally-implement-methods)]:
+    ```rust
+    use std::fmt::Display;
+
+    struct Pair<T> {
+        x: T,
+        y: T,
+    }
+
+    impl<T> Pair<T> {
+        fn new(x: T, y: T) -> Self {
+            Self { x, y }
+        }
+    }
+
+    impl<T: Display + PartialOrd> Pair<T> {
+        fn cmp_display(&self) {
+            if self.x >= self.y {
+                println!("The largest member is x = {}", self.x);
+            } else {
+                println!("The largest member is y = {}", self.y);
+            }
+        }
+    }
+    ```
+    In the example above, `Pair<T>` only implements the `cmp_display` method if its inner type `T` implements the `PartialOrd` trait *and* the `Display` trait [[ch10-02](https://doc.rust-lang.org/book/ch10-02-traits.html#using-trait-bounds-to-conditionally-implement-methods)]
+* We can also conditionally implement a trait for any type that implements another trait. Implementations of a trait on any type that satisfies the trait bounds are called *blanket implementations*. For example, the standard library implements the `ToString` trait on any type that implements the `Display` trait:
+    ```rust
+    impl<T: Display> ToString for T {
+        // ...
+    }
+    ```
+
+
 <!--
     Next chapter to read:
-    https://doc.rust-lang.org/book/ch09-00-error-handling.html
+    https://doc.rust-lang.org/book/ch10-00-generics.html
  -->

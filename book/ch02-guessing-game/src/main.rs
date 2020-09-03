@@ -1,6 +1,24 @@
 use rand::Rng;
 use std::{cmp::Ordering, io};
 
+pub struct Guess {
+    value: i32,
+}
+
+impl Guess {
+    pub fn new(value: i32) -> Guess {
+        if value < 1 || value > 100 {
+            panic!("Guess value must be between 1 and 100, got {}.", value);
+        }
+
+        Guess { value }
+    }
+
+    pub fn value(&self) -> i32 {
+        self.value
+    }
+}
+
 fn main() {
     println!("Guess the number!");
 
@@ -15,18 +33,26 @@ fn main() {
             .read_line(&mut guess)
             .expect("Failed to read line");
 
-        let guess: u32 = match guess.trim().parse() {
+        let guess: i32 = match guess.trim().parse() {
             Ok(number) => number,
             Err(_) => continue,
         };
         // @Note: we could also use a turbofish and not annotate `guess`'s type:
         //  |
-        //  |   let guess = match guess.trim().parse::<u32>() { ... }
+        //  |   let guess = match guess.trim().parse::<i32>() { ... }
         //
 
-        println!("You guessed: {}", guess);
+        let guess = match guess {
+            1..=100 => Guess::new(guess),
+            _ => {
+                println!("The secret number will be between 1 and 100.");
+                continue;
+            }
+        };
 
-        match guess.cmp(&secret_number) {
+        println!("You guessed: {}", guess.value());
+
+        match guess.value().cmp(&secret_number) {
             Ordering::Less => println!("Too small!"),
             Ordering::Greater => println!("Too big!"),
             Ordering::Equal => {
