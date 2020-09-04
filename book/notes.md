@@ -494,5 +494,5 @@
 
 <!--
     Next chapter to read:
-    https://doc.rust-lang.org/book/ch12-04-testing-the-librarys-functionality.html
+    https://doc.rust-lang.org/book/ch13-00-functional-features.html
  -->
