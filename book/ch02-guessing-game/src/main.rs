@@ -62,3 +62,20 @@ fn main() {
         }
     }
 }
+
+//
+// Test functions.
+//
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // @Note: using `should_panic` with `expected` will only pass if the test
+    // function panics *and* the panic message contains the expected substring.
+    #[test]
+    #[should_panic(expected = "Guess value must be between 1 and 100")]
+    fn greater_than_100() {
+        Guess::new(200);
+    }
+}

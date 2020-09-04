@@ -395,8 +395,104 @@
     }
     ```
 
+## Lifetimes
+* Lifetime annotations describe the relationships of the lifetimes of multiple references to each other without affecting the lifetimes [[ch10-03](https://doc.rust-lang.org/book/ch10-03-lifetime-syntax.html#lifetime-annotation-syntax)]
+* One lifetime annotation by itself doesn't have much meaning, because the annotations are meant to tell Rust how generic lifetime parameters of multiple references relate to each other
+    ```rust
+    fn longest<'a>(x: &'a str, y: &'a str) -> &'a str {
+        if x.len() > y.len() {
+            x
+        } else {
+            y
+        }
+    }
+    ```
+    The constraint expressed in this signature is that all the references in the parameters and the return value must have the same lifetime. In practice, it means that the lifetime of the reference returned by the `longest` function is the same as the smaller of the lifetimes of the references passed in [[ch10-03](https://doc.rust-lang.org/book/ch10-03-lifetime-syntax.html#lifetime-annotations-in-function-signatures)]
+* In the example above, when we pass concrete references to `longest`, the concrete lifetime that is substituted for `'a` is the part of the scope of `x` that overlaps with the scope of `y`
+    ```rust
+    fn main() {
+        let string1 = String::from("long string is long"); // valid until the end of the outer scope
+
+        {
+            let string2 = String::from("xyz"); // valid until the end of the inner scope
+            let result = longest(string1.as_str(), string2.as_str());
+            println!("The longest string is {}", result);
+        }
+    }
+    ```
+    Since `result` references something that is valid until the end of the inner scope, the borrow checker approves of it, and it will successfully compile. However, if we tried the following:
+    ```rust
+    fn main() {
+        let string1 = String::from("long string is long");
+        let result;
+        {
+            let string2 = String::from("xyz");
+            result = longest(string1.as_str(), string2.as_str());
+        }
+        println!("The longest string is {}", result);
+    }
+    ```
+    I wouldn't compile, as `string2` does not live long enough (i.e. it is dropped at the end of the inner scope while still borrowed).
+* Lifetimes on function or method parameters are called *input lifetimes*, and lifetimes on return values are called *output lifetimes*. The Rust compiler has a few *lifetime elision* rules that allow it to infer what lifetimes references have when there aren't explicit annotations [[ch10-03](https://doc.rust-lang.org/book/ch10-03-lifetime-syntax.html#lifetime-elision)]:
+    1. Each parameter that is a reference gets its own lifetime parameter
+    2. If there is exactly one input lifetime parameter, that lifetime is assigned to all output lifetime parameters
+    3. If there are multiple input lifetime parameters, but one of them is `&self` or `&mut self` because this is a method, the lifetime of `self` is assigned to all output lifetime parameters
+* Here's an example function signature without lifetime annotations:
+    ```rust
+    fn first_word(s: &str) -> &str {
+
+    // Compiler applies the first rule, giving each parameter its own lifetime:
+    fn first_word<'a>(s: &'a str) -> &str {
+
+    // Compiler applies the second rule, because there is exactly one input lifetime:
+    fn first_word<'a>(s: &'a str) -> &'a str {
+    ```
+    Now all the references in this function signature have lifetimes. Looking at another example:
+    ```rust
+    fn longest(x: &str, y: &str) -> &str {
+
+    // Applying the first rule, each parameter gets its own lifetime:
+    fn longest<'a, 'b>(x: &'a str, y: &'b str) -> &str {
+
+    // Note that the second rule doesn't apply, because there is more than one input lifetime.
+    // The third rule doesn't apply either, because `longest` is a function rather than a method.
+    ```
+    After working through all three rules, we still couldn't figure out what the return type's lifetime is, hence why this gives a compiler error.
+* One special lifetime is `'static`, which means that this reference *can* live for the entire duration of the program [[ch10-03](https://doc.rust-lang.org/book/ch10-03-lifetime-syntax.html#the-static-lifetime)]
+
+## Tests
+* You can use the `Result<T, E>` type as a return for test functions instead of panicking, so that you can use the question mark operator in the body of tests [[ch11-01](https://doc.rust-lang.org/book/ch11-01-writing-tests.html#using-resultt-e-in-tests)]
+* Some command line options go to `cargo test`, and some go to the resulting test binary. To separate these two types of arguments, you list the arguments that go to `cargo test` followed by the separator `--` and then the ones that go to the test binary [[ch11-02](https://doc.rust-lang.org/book/ch11-02-running-tests.html#controlling-how-tests-are-run)]
+* By default, if a test passes, Rust's test library captures anything printed to standard output. If you want to, you can tell Rust to also show the output of successful tests at the end with `cargo test -- --show-output` [[ch11-02](https://doc.rust-lang.org/book/ch11-02-running-tests.html#showing-function-output)]
+* We can specify part of a test name, and any test whose name matches that value will be run. For example [[ch11-02](https://doc.rust-lang.org/book/ch11-02-running-tests.html#filtering-to-run-multiple-tests)]:
+    ```rust
+    pub fn add_two(a: i32) -> i32 {
+        a + 2
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn add_two_and_two() { assert_eq!(4, add_two(2)); }
+
+        #[test]
+        fn add_three_and_two() { assert_eq!(5, add_two(3)); }
+
+        #[test]
+        fn one_hundred() { assert_eq!(102, add_two(100)); }
+    }
+    ```
+    Running `cargo test add` will filter out the test named `one_hundred`.
+* Using the `#[ignore]` attribute you can ignore some tests by default. Then, if you want to run only the ignored tests you can use `cargo test -- --ignored` [[ch11-02](https://doc.rust-lang.org/book/ch11-02-running-tests.html#ignoring-some-tests-unless-specifically-requested)]
+* There are two main categories: *unit tests* and *integration tests* [[ch11-03](https://doc.rust-lang.org/book/ch11-03-test-organization.html)]
+  * The purpose of unit tests is to test each unit of code in isolation, and you'll ususally put them in the *src* directory in each file with the code that they're testing [[ch11-03](https://doc.rust-lang.org/book/ch11-03-test-organization.html#unit-tests)]
+  * In Rust, integration tests are entirely external to your library, with the purpose of testing whether many parts of your library work together correctly. To create them, you first need a *tests* directory at the top level of a project, next to *src* [[ch11-03](https://doc.rust-lang.org/book/ch11-03-test-organization.html#unit-tests)]
+  * If our project is a binary crate that only contains a *src/main.rs* file and doesn't have a *src/lib.rs* file, we can't create integration tests in the tests directory and bring functions defined in the *src/main.rs* file into scope with a use statement. Only library crates expose functions that other crates can use; binary crates are meant to be run on their own [[ch11-03](https://doc.rust-lang.org/book/ch11-03-test-organization.html#integration-tests-for-binary-crates)]
+  * This is one of the reasons Rust projects that provide a binary have a straightforward *src/main.rs* file that calls logic that lives in the *src/lib.rs* file. Using that structure, integration tests can test the library crate with `use` to make the important functionality available
 
 <!--
     Next chapter to read:
-    https://doc.rust-lang.org/book/ch10-00-generics.html
+    https://doc.rust-lang.org/book/ch12-04-testing-the-librarys-functionality.html
  -->
