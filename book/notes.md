@@ -12,6 +12,29 @@
 * *Statements* are instructions that perform some action and do not return a value. *Expressions* evaluate to a resulting value
 * Expressions do not include ending semicolons. If you add a semicolon to the end of an expression, you turn it into a statement, which will then not return a value
 * Passing a variable to a function will move or copy, just as assignment does [[ch04-01](https://doc.rust-lang.org/book/ch04-01-what-is-ownership.html#ownership-and-functions)]
+* When a closure captures a value from its environment, it uses memory to store the values for use in the closure body. Because functions are never allowed to capture their environment, defining and using functions will never incur this overhead [[ch13-01](https://doc.rust-lang.org/book/ch13-01-closures.html#capturing-the-environment-with-closures)]
+* Closures can capture values from their environment in three ways, which directly map to the three ways a function can take a parameter: taking ownership, borrowing mutably, and borrowing immutably. These are encoded in the three `Fn` traits as follows:
+  * `FnOnce` consumes the variables it captures from its enclosing scope, known as the closure's environment. To consume the captured variables, the closure must take ownership of these variables and move them into the closure when it is defined. The Once part of the name represents the fact that the closure can't take ownership of the same variables more than once, so it can be called only once
+  * `FnMut` can change the environment because it mutably borrows values
+  * `Fn` borrows values from the environment immutably
+  Rust infers which trait to use based on how the closure uses the values from the environment
+* If you want to force the closure to take ownership of the values it uses in the environment, you can use the `move` keyword before the parameter list:
+    ```rust
+    fn main() {
+        let x = vec![1, 2, 3];
+
+        let equal_to_x = move |z| z == x;
+
+        // The following line results in a compilation error:
+        println!("can't use x here: {:?}", x);
+
+        let y = vec![1, 2, 3];
+
+        assert!(equal_to_x(y));
+    }
+    ```
+    This technique is mostly useful when passing a closure to a new thread to move the data so it's owned by the new thread
+
 
 ## Methods
 * *Methods* are different from *functions* in that they're defined within the context of a struct, an enum or a trait object, and their first parameter is always `self` [[ch05-03](https://doc.rust-lang.org/book/ch05-03-method-syntax.html#method-syntax)]
@@ -492,7 +515,37 @@
   * If our project is a binary crate that only contains a *src/main.rs* file and doesn't have a *src/lib.rs* file, we can't create integration tests in the tests directory and bring functions defined in the *src/main.rs* file into scope with a use statement. Only library crates expose functions that other crates can use; binary crates are meant to be run on their own [[ch11-03](https://doc.rust-lang.org/book/ch11-03-test-organization.html#integration-tests-for-binary-crates)]
   * This is one of the reasons Rust projects that provide a binary have a straightforward *src/main.rs* file that calls logic that lives in the *src/lib.rs* file. Using that structure, integration tests can test the library crate with `use` to make the important functionality available
 
+## Iterators
+* Iterators are *lazy*, meaning they have no effect until you call methods that consume the iterator to use it up [[ch13-02](https://doc.rust-lang.org/book/ch13-02-iterators.html#processing-a-series-of-items-with-iterators)]
+* All iterators implement the `Iterator` trait, defined in the standard library, which looks like [[ch13-02](https://doc.rust-lang.org/book/ch13-02-iterators.html#processing-a-series-of-items-with-iterators)]:
+    ```rust
+    pub trait Iterator {
+        type Item;
+
+        fn next(&mut self) -> Option<Self::Item>;
+
+        // Methods with default implementations elided...
+    }
+    ```
+* The `iter` method produces an iterator over immutable references. If we want to create an iterator that takes ownership of `v1` and returns owned values, we can call `into_iter` instead. Similarly, if we want to iterate over mutable references, we can call `iter_mut` [[ch13-02](https://doc.rust-lang.org/book/ch13-02-iterators.html#the-iterator-trait-and-the-next-method)]:
+    ```rust
+    #[test]
+    fn iterator_demonstration() {
+        let v1 = vec![1, 2, 3];
+
+        let mut v1_iter = v1.iter();
+
+        assert_eq!(v1_iter.next(), Some(&1));
+        assert_eq!(v1_iter.next(), Some(&2));
+        assert_eq!(v1_iter.next(), Some(&3));
+        assert_eq!(v1_iter.next(), None);
+    }
+    ```
+    Note that we needed to make `v1_iter` mutable: calling the next method on an iterator changes internal state that the iterator uses to keep track of where it is in the sequence. In other words, this code *consumes*, or uses up, the iterator.
+* Methods that call next are called *consuming adaptors*, because calling them uses up the iterator [[ch13-02](https://doc.rust-lang.org/book/ch13-02-iterators.html#methods-that-consume-the-iterator)]
+* Other methods defined on the `Iterator` trait, known as *iterator adaptors*, allow you to change iterators into different kinds of iterators. You can chain multiple calls to iterator adaptors to perform complex actions in a readable way [[ch13-20](https://doc.rust-lang.org/book/ch13-02-iterators.html#methods-that-produce-other-iterators)]
+
 <!--
     Next chapter to read:
-    https://doc.rust-lang.org/book/ch13-00-functional-features.html
+    https://doc.rust-lang.org/book/ch14-01-release-profiles.html
  -->
