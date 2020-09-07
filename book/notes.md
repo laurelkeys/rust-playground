@@ -621,9 +621,13 @@
     * References must always be valid
 
     Thus, it is useful when you're sure your code follows the borrowing rules but the compiler is unable to understand and guarantee that.
-
+* When creating immutable and mutable references, we use the `&` and `&mut` syntax, respectively. With `RefCell<T>`, we use the `borrow` and `borrow_mut` methods, which are part of the safe API that belongs to `RefCell<T>` [[ch15-05](https://doc.rust-lang.org/book/ch15-05-interior-mutability.html#a-use-case-for-interior-mutability-mock-objects)]
+* `borrow` returns the smart pointer type `Ref<T>`, and `borrow_mut` returns the smart pointer type `RefMut<T>`, and `RefCell<T>` keeps track of how many of them are currently active to ensure the borrowing rules at runtime, which protects us from data races
+* A common way to use `RefCell<T>` is in combination with `Rc<T>`. Since `Rc<T>` lets you have multiple owners of some data, but it only gives immutable access to that data, by having an `Rc<T>` that holds a `RefCell<T>`, you can get a value that can have multiple owners and that you can mutate [[ch15-05](https://doc.rust-lang.org/book/ch15-05-interior-mutability.html#having-multiple-owners-of-mutable-data-by-combining-rct-and-refcellt)]
+* Rust's memory safety guarantees make it difficult, but not impossible, to accidentally create *memory leaks*. For instance, by using `Rc<T>` and `RefCell<T>` it's possible to create references where items refer to each other in a cycle, so their reference counts will never reach 0, and thus, the values will never be dropped [[ch15-06](https://doc.rust-lang.org/book/ch15-06-reference-cycles.html#reference-cycles-can-leak-memory)]
+* Creating reference cycles is not easily done, but it's not impossible either. If you have similar nested combinations of types with interior mutability and reference counting, you must ensure that you don't create cycles [[ch15-06](https://doc.rust-lang.org/book/ch15-06-reference-cycles.html#creating-a-reference-cycle)]
 
 <!--
     Next chapter to read:
-    https://doc.rust-lang.org/book/ch15-05-interior-mutability.html#a-use-case-for-interior-mutability-mock-objects
+    https://doc.rust-lang.org/book/ch15-06-reference-cycles.html#preventing-reference-cycles-turning-an-rct-into-a-weakt
  -->
