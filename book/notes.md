@@ -545,7 +545,28 @@
 * Methods that call next are called *consuming adaptors*, because calling them uses up the iterator [[ch13-02](https://doc.rust-lang.org/book/ch13-02-iterators.html#methods-that-consume-the-iterator)]
 * Other methods defined on the `Iterator` trait, known as *iterator adaptors*, allow you to change iterators into different kinds of iterators. You can chain multiple calls to iterator adaptors to perform complex actions in a readable way [[ch13-20](https://doc.rust-lang.org/book/ch13-02-iterators.html#methods-that-produce-other-iterators)]
 
+## Documentation
+* Documentation comments use three slashes, `///`, instead of two and support Markdown notation for formatting the text. Place documentation comments just before the item they're documenting [[ch14-02](https://doc.rust-lang.org/book/ch14-02-publishing-to-crates-io.html#making-useful-documentation-comments)]:
+    ```rust
+    /// Adds one to the number given.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let arg = 5;
+    /// let answer = my_crate::add_one(arg);
+    ///
+    /// assert_eq!(6, answer);
+    /// ```
+    pub fn add_one(x: i32) -> i32 {
+        x + 1
+    }
+    ```
+    Besides "Examples", other commonly used sections are "Panics", "Errors" and "Safety" [[ch14-02](https://doc.rust-lang.org/book/ch14-02-publishing-to-crates-io.html#commonly-used-sections)]
+* Running `cargo test` will run the code examples in your documentation as tests [[ch14-02](https://doc.rust-lang.org/book/ch14-02-publishing-to-crates-io.html#documentation-comments-as-tests)]
+* Another style of doc comment, `//!`, adds documentation to the item that contains the comments rather than adding documentation to the items following the comments. We typically use these doc comments inside the crate root file (*src/lib.rs* by convention) or inside a module to document the crate or the module as a whole [[ch14-02](https://doc.rust-lang.org/book/ch14-02-publishing-to-crates-io.html#commenting-contained-items)]
+
 <!--
     Next chapter to read:
-    https://doc.rust-lang.org/book/ch14-01-release-profiles.html
+    https://doc.rust-lang.org/book/ch15-00-smart-pointers.html
  -->

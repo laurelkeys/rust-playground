@@ -13,3 +13,4 @@ target/
 Cargo.lock
 
 # Miscellaneous
+!book/ch14-add/Cargo.lock
