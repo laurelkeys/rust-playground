@@ -14,10 +14,10 @@
 * Passing a variable to a function will move or copy, just as assignment does [[ch04-01](https://doc.rust-lang.org/book/ch04-01-what-is-ownership.html#ownership-and-functions)]
 * When a closure captures a value from its environment, it uses memory to store the values for use in the closure body. Because functions are never allowed to capture their environment, defining and using functions will never incur this overhead [[ch13-01](https://doc.rust-lang.org/book/ch13-01-closures.html#capturing-the-environment-with-closures)]
 * Closures can capture values from their environment in three ways, which directly map to the three ways a function can take a parameter: taking ownership, borrowing mutably, and borrowing immutably. These are encoded in the three `Fn` traits as follows:
-  * `FnOnce` consumes the variables it captures from its enclosing scope, known as the closure's environment. To consume the captured variables, the closure must take ownership of these variables and move them into the closure when it is defined. The Once part of the name represents the fact that the closure can't take ownership of the same variables more than once, so it can be called only once
-  * `FnMut` can change the environment because it mutably borrows values
-  * `Fn` borrows values from the environment immutably
-  Rust infers which trait to use based on how the closure uses the values from the environment
+    * `FnOnce` consumes the variables it captures from its enclosing scope, known as the closure's environment. To consume the captured variables, the closure must take ownership of these variables and move them into the closure when it is defined. The Once part of the name represents the fact that the closure can't take ownership of the same variables more than once, so it can be called only once
+    * `FnMut` can change the environment because it mutably borrows values
+    * `Fn` borrows values from the environment immutably
+    Rust infers which trait to use based on how the closure uses the values from the environment
 * If you want to force the closure to take ownership of the values it uses in the environment, you can use the `move` keyword before the parameter list:
     ```rust
     fn main() {
@@ -56,7 +56,7 @@
     let home = IpAddr::V4(String::from("127.0.0.1"));
     let loopback = IpAddr::V6(String::from("::1"));
     ```
-  Could be rewritten as [[ch06-01](https://doc.rust-lang.org/book/ch06-01-defining-an-enum.html#enum-values)]:
+    Could be rewritten as [[ch06-01](https://doc.rust-lang.org/book/ch06-01-defining-an-enum.html#enum-values)]:
     ```rust
     enum IpAddr {
         V4(u8, u8, u8, u8),
@@ -100,7 +100,7 @@
     let black = Color(0, 0, 0);
     let origin = Point(0, 0, 0);
     ```
-  You can destructure them into their individual pieces, you can use a `.` followed by the index to access an individual value, and so on.
+    You can destructure them into their individual pieces, you can use a `.` followed by the index to access an individual value, and so on.
 * You can also define *unit-like structs* that don't have any fields, which behave similarly to `()`, the unit type. They can be useful in situations in which you need to implement a trait on some type but don't have any data that you want to store in the type itself [[ch05-10](https://doc.rust-lang.org/book/ch05-01-defining-structs.html#unit-like-structs-without-any-fields)]
 
 ## Match
@@ -143,9 +143,9 @@
 
 ## Ownership
 * Memory is managed through a system of ownership with a set of rules that the compiler checks at compile time [[ch04-01](https://doc.rust-lang.org/book/ch04-01-what-is-ownership.html#ownership-rules)]:
-  * Each value in Rust has a variable that's called its *owner*
-  * There can only be one owner at a time
-  * When the owner goes out of scope, the value will be dropped (*RAII*)
+    * Each value in Rust has a variable that's called its *owner*
+    * There can only be one owner at a time
+    * When the owner goes out of scope, the value will be dropped (*RAII*)
 * The concept of copying the pointer, length, and capacity (in the case of a `String`) without copying the data probably sounds like making a *shallow copy*. But because Rust also invalidates the first variable, instead of being called a shallow copy, it's known as a *move* [[ch04-01](https://doc.rust-lang.org/book/ch04-01-what-is-ownership.html#memory-and-allocation)]:
     ```rust
     let s1 = String::from("hello");
@@ -162,12 +162,12 @@
     let x = 5;
     let y = x; // y is still valid
     ```
-  Rust has a special annotation called the `Copy` trait that we can place on types like integers that are stored on the stack.
+    Rust has a special annotation called the `Copy` trait that we can place on types like integers that are stored on the stack.
 * Rust won't let us annotate a type with the `Copy` trait if the type, or any of its parts, has implemented the Drop trait. If the type needs something special to happen when the value goes out of scope and we add the `Copy` annotation to that type, we'll get a compile-time error.
 * As a general rule, any group of simple scalar values can be `Copy`, and nothing that requires allocation or is some form of resource is `Copy`
 * We call having references as function parameters *borrowing* [[ch04-02](https://doc.rust-lang.org/book/ch04-02-references-and-borrowing.html#references-and-borrowing)]
 * *Mutable references* (`&mut`) have one big restriction: you can have only one mutable reference to a particular piece of data in a particular scope, and you *also* cannot have a mutable reference while there is an immutable one in scope [[ch04-02](https://doc.rust-lang.org/book/ch04-02-references-and-borrowing.html#mutable-references)]
-  * Because of this, data races can be prevented at compile-time
+    * Because of this, data races can be prevented at compile-time
 * A reference's scope starts from where it is introduced and continues through the last time that reference is used. As such, the following works because the last usage of the immutable references occurs before the mutable reference is introduced:
     ```rust
     let mut s = String::from("hello");
@@ -204,7 +204,7 @@
         // ...
     }
     ```
- * On the other hand, when bringing in structs, enums, and other items with `use`, it's idiomatic to specify the full path:
+* On the other hand, when bringing in structs, enums, and other items with `use`, it's idiomatic to specify the full path:
     ```rust
     use std::collections::HashMap;
     fn main() {
@@ -220,7 +220,7 @@
     fn function1() -> fmt::Result { /* ... */ }
     fn function2() -> io::Result<()> { /* ... */ }
     ```
-  Or create a new local name, or alias, for one of the types with `as`:
+    Or create a new local name, or alias, for one of the types with `as`:
     ```rust
     use std::fmt::Result;
     use std::io::Result as IoResult;
@@ -228,7 +228,7 @@
     fn function1() -> Result { /* ... */ }
     fn function2() -> IoResult<()> { /* ... */ }
     ```
- * When a name is brought into scope with `use`, the name available in the new scope is private. To enable the code that calls our code to refer to it as if it was defined in that code's scope, we can combine `pub` and `use`. This technique is called *re-exporting* [[ch07-04](https://doc.rust-lang.org/book/ch07-04-bringing-paths-into-scope-with-the-use-keyword.html#re-exporting-names-with-pub-use)]
+* When a name is brought into scope with `use`, the name available in the new scope is private. To enable the code that calls our code to refer to it as if it was defined in that code's scope, we can combine `pub` and `use`. This technique is called *re-exporting* [[ch07-04](https://doc.rust-lang.org/book/ch07-04-bringing-paths-into-scope-with-the-use-keyword.html#re-exporting-names-with-pub-use)]
 
 ## Vector
 * Example of iterating over a *vector* with immutable vs. mutable references [[ch08-01](https://doc.rust-lang.org/book/ch08-01-vectors.html#iterating-over-the-values-in-a-vector)]:
@@ -239,7 +239,7 @@
 
     for i in &mut v { *i += 50; }
     ```
-  Note that, to change the value that the mutable reference refers to, we use the dereference operator (`*`).
+    Note that, to change the value that the mutable reference refers to, we use the dereference operator (`*`).
 
 ## Strings
 * For any type that implements the `Display` trait we can convert it into a `String` in two ways [[ch08-02](https://doc.rust-lang.org/book/ch08-02-strings.html)]:
@@ -259,7 +259,7 @@
     let s2 = String::from("world!");
     let s3 = s1 + &s2; // note `s1` has been moved here and can no longer be used
     ```
-  Note that, although the second parameter is a `&str`, `&s2`'s type is actually `&String`. The reason we're able to use `&s2` in the call to `add` is that the compiler can *coerce* the `&String` argument into a `&str`. When we call the `add` method, Rust uses a *deref coercion*, which here turns `&s2` into `&s2[..]`.
+    Note that, although the second parameter is a `&str`, `&s2`'s type is actually `&String`. The reason we're able to use `&s2` in the call to `add` is that the compiler can *coerce* the `&String` argument into a `&str`. When we call the `add` method, Rust uses a *deref coercion*, which here turns `&s2` into `&s2[..]`.
 * If we need to concatenate multiple strings, the behavior of the `+` operator gets unwieldy:
     ```rust
     let s1 = String::from("tic");
@@ -268,7 +268,7 @@
 
     let s = s1 + "-" + &s2 + "-" + &s3; // `s` is "tic-tac-toe"
     ```
-  Because of this, we'd usually use the `format!` macro in this case, which is much easier to read (and doesn't take ownership of any of its parameters):
+    Because of this, we'd usually use the `format!` macro in this case, which is much easier to read (and doesn't take ownership of any of its parameters):
     ```rust
     let s1 = String::from("tic");
     let s2 = String::from("tac");
@@ -290,13 +290,13 @@
         println!("{}", c);
     }
     ```
-  Raw bytes:
+    Raw bytes:
     ```rust
     for b in "नमस्ते".bytes() {
         println!("{}", b);
     }
     ```
-  Getting grapheme clusters from strings is complex though, so this functionality is not provided by the standard library.
+    Getting grapheme clusters from strings is complex though, so this functionality is not provided by the standard library.
 
 ## Hash Map
 * Another way of constructing a hash map is by using iterators and the collect method on a vector of tuples, where each tuple consists of a key and its value [[ch08-03](https://doc.rust-lang.org/book/ch08-03-hash-maps.html#creating-a-new-hash-map)]:
@@ -510,10 +510,10 @@
     Running `cargo test add` will filter out the test named `one_hundred`.
 * Using the `#[ignore]` attribute you can ignore some tests by default. Then, if you want to run only the ignored tests you can use `cargo test -- --ignored` [[ch11-02](https://doc.rust-lang.org/book/ch11-02-running-tests.html#ignoring-some-tests-unless-specifically-requested)]
 * There are two main categories: *unit tests* and *integration tests* [[ch11-03](https://doc.rust-lang.org/book/ch11-03-test-organization.html)]
-  * The purpose of unit tests is to test each unit of code in isolation, and you'll ususally put them in the *src* directory in each file with the code that they're testing [[ch11-03](https://doc.rust-lang.org/book/ch11-03-test-organization.html#unit-tests)]
-  * In Rust, integration tests are entirely external to your library, with the purpose of testing whether many parts of your library work together correctly. To create them, you first need a *tests* directory at the top level of a project, next to *src* [[ch11-03](https://doc.rust-lang.org/book/ch11-03-test-organization.html#unit-tests)]
-  * If our project is a binary crate that only contains a *src/main.rs* file and doesn't have a *src/lib.rs* file, we can't create integration tests in the tests directory and bring functions defined in the *src/main.rs* file into scope with a use statement. Only library crates expose functions that other crates can use; binary crates are meant to be run on their own [[ch11-03](https://doc.rust-lang.org/book/ch11-03-test-organization.html#integration-tests-for-binary-crates)]
-  * This is one of the reasons Rust projects that provide a binary have a straightforward *src/main.rs* file that calls logic that lives in the *src/lib.rs* file. Using that structure, integration tests can test the library crate with `use` to make the important functionality available
+    * The purpose of unit tests is to test each unit of code in isolation, and you'll ususally put them in the *src* directory in each file with the code that they're testing [[ch11-03](https://doc.rust-lang.org/book/ch11-03-test-organization.html#unit-tests)]
+    * In Rust, integration tests are entirely external to your library, with the purpose of testing whether many parts of your library work together correctly. To create them, you first need a *tests* directory at the top level of a project, next to *src* [[ch11-03](https://doc.rust-lang.org/book/ch11-03-test-organization.html#unit-tests)]
+    * If our project is a binary crate that only contains a *src/main.rs* file and doesn't have a *src/lib.rs* file, we can't create integration tests in the tests directory and bring functions defined in the *src/main.rs* file into scope with a use statement. Only library crates expose functions that other crates can use; binary crates are meant to be run on their own [[ch11-03](https://doc.rust-lang.org/book/ch11-03-test-organization.html#integration-tests-for-binary-crates)]
+    * This is one of the reasons Rust projects that provide a binary have a straightforward *src/main.rs* file that calls logic that lives in the *src/lib.rs* file. Using that structure, integration tests can test the library crate with `use` to make the important functionality available
 
 ## Iterators
 * Iterators are *lazy*, meaning they have no effect until you call methods that consume the iterator to use it up [[ch13-02](https://doc.rust-lang.org/book/ch13-02-iterators.html#processing-a-series-of-items-with-iterators)]
@@ -569,13 +569,18 @@
 ## Smart Pointers
 * In Rust, which uses the concept of ownership and borrowing, an additional difference between references and smart pointers is that references are pointers that only borrow data; in contrast, in many cases, smart pointers *own* the data they point to [[ch15-00](https://doc.rust-lang.org/book/ch15-00-smart-pointers.html)]
 * The characteristic that distinguishes a smart pointer from an ordinary struct is that smart pointers implement the `Deref` and `Drop` traits:
-  * `Deref` allows an instance of the smart pointer struct to behave like a reference
-  * `Drop` allows you to customize the code that is run when an instance of the smart pointer goes out of scope
+    * `Deref` allows an instance of the smart pointer struct to behave like a reference
+    * `Drop` allows you to customize the code that is run when an instance of the smart pointer goes out of scope
 * The most common smart pointers in the standard library are:
-  * `Box<T>` for allocating values on the heap
-  * `Rc<T>`, a reference counting type that enables multiple ownership
-  * `Ref<T>` and `RefMut<T>`, accessed through `RefCell<T>`, a type that enforces the borrowing rules at runtime instead of compile time
+    * `Box<T>` for allocating values on the heap
+    * `Rc<T>`, a reference counting type that enables multiple ownership
+    * `Ref<T>` and `RefMut<T>`, accessed through `RefCell<T>`, a type that enforces the borrowing rules at runtime instead of compile time
+* Here are the main reasons for choosing them [[ch15-05](https://doc.rust-lang.org/book/ch15-05-interior-mutability.html#enforcing-borrowing-rules-at-runtime-with-refcellt)]:
+    * `Rc<T>` enables multiple owners of the same data; `Box<T>` and `RefCell<T>` have single owners
+    * `Box<T>` allows immutable or mutable borrows checked at compile time; `Rc<T>` allows only immutable borrows checked at compile time; `RefCell<T>` allows immutable or mutable borrows checked at runtime
+    * Because `RefCell<T>` allows mutable borrows checked at runtime, you can mutate the value inside the `RefCell<T>` even when the `RefCell<T>` is immutable
 * *Boxes* provide only the indirection and heap allocation; they don't have any other special capabilities. They also don't have any performance overhead that these special capabilities incur [[ch15-01](https://doc.rust-lang.org/book/ch15-01-box.html#computing-the-size-of-a-non-recursive-type)]
+### Deref and Drop
 * The `Deref` trait, provided by the standard library, requires us to implement one method named `deref` that borrows `self` and returns a reference to the inner data [[ch15-02](https://doc.rust-lang.org/book/ch15-02-deref.html#treating-a-type-like-a-reference-by-implementing-the-deref-trait)]
     ```rust
     struct MyBox<T>(T);
@@ -600,13 +605,25 @@
     In the last line, when we write `*y`, Rust actually substitutes it with `*(y.deref())`. The reason the `deref` method returns a reference to a value, and that the plain dereference outside the parentheses in `*(y.deref())` is still necessary, is the ownership system. If it returned the value directly instead of a reference to the value, the value would be moved out of `self`.
 * *Deref coercion* is a convenience that Rust performs on arguments to functions and methods for types that implement the `Deref` trait, converting it into a reference to another type [[ch15-01](https://doc.rust-lang.org/book/ch15-02-deref.html#implicit-deref-coercions-with-functions-and-methods)]
 * Rust does deref coercion when it finds types and trait implementations in three cases [[ch15-02](https://doc.rust-lang.org/book/ch15-02-deref.html#how-deref-coercion-interacts-with-mutability)]:
-  * From `&T` to `&U` when `T: Deref<Target=U>`
-  * From `&mut T` to `&mut U` when `T: DerefMut<Target=U>`
-  * From `&mut T` to `&U` when `T: Deref<Target=U>`
+    * From `&T` to `&U` when `T: Deref<Target=U>`
+    * From `&mut T` to `&mut U` when `T: DerefMut<Target=U>`
+    * From `&mut T` to `&U` when `T: Deref<Target=U>`
 * Disabling `drop` isn't usually necessary; the whole point of the `Drop` trait is that it's taken care of automatically. Occasionally, however, you might want to clean up a value early (e.g. when using smart pointers that manage locks). In this cases you have to call the `std::mem::drop` function provided by the standard library if you want to force a value to be dropped before the end of its scope [[ch15-03](https://doc.rust-lang.org/book/ch15-03-drop.html#dropping-a-value-early-with-stdmemdrop)]
-*
+### Rc<T> and Reference Count
+* Using `Rc<T>` allows a single value to have multiple owners, and the reference count ensures that the value remains valid as long as any of the owners still exist [[ch15-04](https://doc.rust-lang.org/book/ch15-04-rc.html#cloning-an-rct-increases-the-reference-count)]
+* Every time we call `Rc::clone`, the reference count to the data within `Rc<T>` will increase, and the data won't be cleaned up unless there are zero references to it [[ch15-04](https://doc.rust-lang.org/book/ch15-04-rc.html#using-rct-to-share-data)]
+* We could also `a.clone()` rather than `Rc::clone(&a)`, but Rust's convention is to use `Rc::clone` in this case, as its implementation doesn't make a deep copy of all the data like most types' implementations of clone do
+### RefCell<T> and Interior Mutability
+* *Interior mutability* is a design pattern in Rust that allows you to mutate data even when there are immutable references to that data; normally, this action is disallowed by the borrowing rules. To mutate data, the pattern uses `unsafe` code inside a data structure to bend Rust's usual rules that govern mutation and borrowing [[ch15-05](https://doc.rust-lang.org/book/ch15-05-interior-mutability.html)]
+* We can use types that use the interior mutability pattern when we can ensure that the borrowing rules will be followed at runtime, even though the compiler can't guarantee that. The `unsafe` code involved is then wrapped in a safe API, and the outer type is still immutable
+* Unlike `Rc<T>`, the `RefCell<T>` type represents single ownership over the data it holds. With references and `Box<T>`, the borrowing rules' invariants are enforced at compile time. With `RefCell<T>`, these invariants are enforced at *runtime* [[ch15-05](https://doc.rust-lang.org/book/ch15-05-interior-mutability.html#enforcing-borrowing-rules-at-runtime-with-refcellt)]:
+    * At any given time, you can have *either* (but not both of) one mutable reference or any number of immutable references
+    * References must always be valid
+
+    Thus, it is useful when you're sure your code follows the borrowing rules but the compiler is unable to understand and guarantee that.
+
 
 <!--
     Next chapter to read:
-    https://doc.rust-lang.org/book/ch15-04-rc.html
+    https://doc.rust-lang.org/book/ch15-05-interior-mutability.html#a-use-case-for-interior-mutability-mock-objects
  -->
