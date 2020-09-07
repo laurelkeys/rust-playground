@@ -566,7 +566,47 @@
 * Running `cargo test` will run the code examples in your documentation as tests [[ch14-02](https://doc.rust-lang.org/book/ch14-02-publishing-to-crates-io.html#documentation-comments-as-tests)]
 * Another style of doc comment, `//!`, adds documentation to the item that contains the comments rather than adding documentation to the items following the comments. We typically use these doc comments inside the crate root file (*src/lib.rs* by convention) or inside a module to document the crate or the module as a whole [[ch14-02](https://doc.rust-lang.org/book/ch14-02-publishing-to-crates-io.html#commenting-contained-items)]
 
+## Smart Pointers
+* In Rust, which uses the concept of ownership and borrowing, an additional difference between references and smart pointers is that references are pointers that only borrow data; in contrast, in many cases, smart pointers *own* the data they point to [[ch15-00](https://doc.rust-lang.org/book/ch15-00-smart-pointers.html)]
+* The characteristic that distinguishes a smart pointer from an ordinary struct is that smart pointers implement the `Deref` and `Drop` traits:
+  * `Deref` allows an instance of the smart pointer struct to behave like a reference
+  * `Drop` allows you to customize the code that is run when an instance of the smart pointer goes out of scope
+* The most common smart pointers in the standard library are:
+  * `Box<T>` for allocating values on the heap
+  * `Rc<T>`, a reference counting type that enables multiple ownership
+  * `Ref<T>` and `RefMut<T>`, accessed through `RefCell<T>`, a type that enforces the borrowing rules at runtime instead of compile time
+* *Boxes* provide only the indirection and heap allocation; they don't have any other special capabilities. They also don't have any performance overhead that these special capabilities incur [[ch15-01](https://doc.rust-lang.org/book/ch15-01-box.html#computing-the-size-of-a-non-recursive-type)]
+* The `Deref` trait, provided by the standard library, requires us to implement one method named `deref` that borrows `self` and returns a reference to the inner data [[ch15-02](https://doc.rust-lang.org/book/ch15-02-deref.html#treating-a-type-like-a-reference-by-implementing-the-deref-trait)]
+    ```rust
+    struct MyBox<T>(T);
+    impl<T> MyBox<T> {
+        fn new(x: T) -> MyBox<T> { MyBox(x) }
+    }
+
+    use std::ops::Deref;
+    impl<T> Deref for MyBox<T> {
+        type Target = T;
+        fn deref(&self) -> &T { &self.0 }
+    }
+
+    fn main() {
+        let x = 5;
+        let y = MyBox::new(x);
+
+        assert_eq!(5, x);
+        assert_eq!(5, *y);
+    }
+    ```
+    In the last line, when we write `*y`, Rust actually substitutes it with `*(y.deref())`. The reason the `deref` method returns a reference to a value, and that the plain dereference outside the parentheses in `*(y.deref())` is still necessary, is the ownership system. If it returned the value directly instead of a reference to the value, the value would be moved out of `self`.
+* *Deref coercion* is a convenience that Rust performs on arguments to functions and methods for types that implement the `Deref` trait, converting it into a reference to another type [[ch15-01](https://doc.rust-lang.org/book/ch15-02-deref.html#implicit-deref-coercions-with-functions-and-methods)]
+* Rust does deref coercion when it finds types and trait implementations in three cases [[ch15-02](https://doc.rust-lang.org/book/ch15-02-deref.html#how-deref-coercion-interacts-with-mutability)]:
+  * From `&T` to `&U` when `T: Deref<Target=U>`
+  * From `&mut T` to `&mut U` when `T: DerefMut<Target=U>`
+  * From `&mut T` to `&U` when `T: Deref<Target=U>`
+* Disabling `drop` isn't usually necessary; the whole point of the `Drop` trait is that it's taken care of automatically. Occasionally, however, you might want to clean up a value early (e.g. when using smart pointers that manage locks). In this cases you have to call the `std::mem::drop` function provided by the standard library if you want to force a value to be dropped before the end of its scope [[ch15-03](https://doc.rust-lang.org/book/ch15-03-drop.html#dropping-a-value-early-with-stdmemdrop)]
+*
+
 <!--
     Next chapter to read:
-    https://doc.rust-lang.org/book/ch15-00-smart-pointers.html
+    https://doc.rust-lang.org/book/ch15-04-rc.html
  -->
