@@ -625,9 +625,89 @@
 * `borrow` returns the smart pointer type `Ref<T>`, and `borrow_mut` returns the smart pointer type `RefMut<T>`, and `RefCell<T>` keeps track of how many of them are currently active to ensure the borrowing rules at runtime, which protects us from data races
 * A common way to use `RefCell<T>` is in combination with `Rc<T>`. Since `Rc<T>` lets you have multiple owners of some data, but it only gives immutable access to that data, by having an `Rc<T>` that holds a `RefCell<T>`, you can get a value that can have multiple owners and that you can mutate [[ch15-05](https://doc.rust-lang.org/book/ch15-05-interior-mutability.html#having-multiple-owners-of-mutable-data-by-combining-rct-and-refcellt)]
 * Rust's memory safety guarantees make it difficult, but not impossible, to accidentally create *memory leaks*. For instance, by using `Rc<T>` and `RefCell<T>` it's possible to create references where items refer to each other in a cycle, so their reference counts will never reach 0, and thus, the values will never be dropped [[ch15-06](https://doc.rust-lang.org/book/ch15-06-reference-cycles.html#reference-cycles-can-leak-memory)]
+### Weak<T> and Weak References
 * Creating reference cycles is not easily done, but it's not impossible either. If you have similar nested combinations of types with interior mutability and reference counting, you must ensure that you don't create cycles [[ch15-06](https://doc.rust-lang.org/book/ch15-06-reference-cycles.html#creating-a-reference-cycle)]
+* Another solution for avoiding reference cycles is reorganizing your data structures so that some references express ownership and some references don't. As a result, you can have cycles made up of some ownership relationships and some non-ownership relationships, and only the ownership relationships affect whether or not a value can be dropped
+* You can also create a *weak reference* to the value within an `Rc<T>` instance by calling `Rc::downgrade` and passing a reference to it, which returns a smart pointer of type `Weak<T>` [[ch15-06](https://doc.rust-lang.org/book/ch15-06-reference-cycles.html#preventing-reference-cycles-turning-an-rct-into-a-weakt)]
+* Instead of increasing the `strong_count` in the `Rc<T>` instance by 1, calling `Rc::downgrade` increases the `weak_count` by 1, which doesn't need to be 0 for the `Rc<T>` instance to be cleaned up
+* Because the value that `Weak<T>` references might have been dropped, to do anything with the value it's pointing to you must make sure the value still exists. You do this by calling the `upgrade` method on a `Weak<T>` instance, which will return an `Option<Rc<T>>`
+
+## Fearless Concurrency
+* *Concurrent programming* is where different parts of a program execute independently, and *parallel programming* is where different parts of a program execute at the same time [[ch16-00](https://doc.rust-lang.org/book/ch16-00-concurrency.html)]
+* *Message-passing* concurrency is where channels send messages between threads, and *shared-state* concurrency is where multiple threads have access to some piece of data
+* Programming languages implement threads in a few different ways [[ch16-06](https://doc.rust-lang.org/book/ch16-01-threads.html#using-threads-to-run-code-simultaneously)]:
+    * Many operating systems provide an API for creating new threads, and the model where a language calls it to create threads is sometimes called *1:1*, meaning one OS thread per one language thread
+    * Many programming languages provide their own special implementation of threads, which are known as *green* threads, and these languages will execute them in the context of a different number of OS threads. For this reason, the green-threaded model is called the *M:N* model
+
+    The green-threading M:N model requires a larger language *runtime* to manage threads. As such, the Rust standard library only provides an implementation of 1:1 threading.
+* To create a new thread, we call the `thread::spawn` function and pass it a closure containing the code we want it to run [[ch16-01](https://doc.rust-lang.org/book/ch16-01-threads.html#creating-a-new-thread-with-spawn)]:
+    ```rust
+    use std::thread;
+    use std::time::Duration;
+
+    fn main() {
+        thread::spawn(|| {
+            for i in 1..10 {
+                println!("hi number {} from the spawned thread!", i);
+                thread::sleep(Duration::from_millis(1));
+            }
+        });
+
+        for i in 1..5 {
+            println!("hi number {} from the main thread!", i);
+            thread::sleep(Duration::from_millis(1));
+        }
+    }
+    ```
+    Note that with this function, the new thread will be stopped when the main thread ends, whether or not it has finished running. We can however wait for it by calling `join` on the `JoinHandle` returned by `thread::spawn`:
+    ```rust
+    use std::thread;
+    use std::time::Duration;
+
+    fn main() {
+        let handle = thread::spawn(|| {
+            for i in 1..10 {
+                println!("hi number {} from the spawned thread!", i);
+                thread::sleep(Duration::from_millis(1));
+            }
+        });
+
+        for i in 1..5 {
+            println!("hi number {} from the main thread!", i);
+            thread::sleep(Duration::from_millis(1));
+        }
+
+        handle.join().unwrap();
+    }
+    ```
+    Calling `join` on the handle blocks the thread currently running until the thread represented by the handle terminates.
+* The `move` closure is often used alongside `thread::spawn` because it allows you to use data from one thread in another thread [[ch16-01](https://doc.rust-lang.org/book/ch16-01-threads.html#using-move-closures-with-threads)]:
+    ```rust
+    use std::thread;
+
+    fn main() {
+        let v = vec![1, 2, 3];
+
+        let handle = thread::spawn(|| { println!("Here's a vector: {:?}", v); });
+        handle.join().unwrap();
+    }
+    ```
+    The code above won't compile because Rust *infers* how to capture `v`, and since `println!` only needs a reference to `v`, the closure tries to borrow it. However, Rust can't tell how long the spawned thread will run, so it doesn't know if the reference will always be valid.
+
+    By adding the move keyword before the closure, we force the closure to take ownership of the values it's using rather than allowing Rust to infer that it should borrow the values:
+    ```rust
+    use std::thread;
+
+    fn main() {
+        let v = vec![1, 2, 3];
+
+        let handle = thread::spawn(move || { println!("Here's a vector: {:?}", v); });
+        handle.join().unwrap();
+    }
+    ```
+
 
 <!--
     Next chapter to read:
-    https://doc.rust-lang.org/book/ch15-06-reference-cycles.html#preventing-reference-cycles-turning-an-rct-into-a-weakt
+    https://doc.rust-lang.org/book/ch16-02-message-passing.html
  -->
