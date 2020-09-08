@@ -634,7 +634,6 @@
 
 ## Fearless Concurrency
 * *Concurrent programming* is where different parts of a program execute independently, and *parallel programming* is where different parts of a program execute at the same time [[ch16-00](https://doc.rust-lang.org/book/ch16-00-concurrency.html)]
-* *Message-passing* concurrency is where channels send messages between threads, and *shared-state* concurrency is where multiple threads have access to some piece of data
 * Programming languages implement threads in a few different ways [[ch16-06](https://doc.rust-lang.org/book/ch16-01-threads.html#using-threads-to-run-code-simultaneously)]:
     * Many operating systems provide an API for creating new threads, and the model where a language calls it to create threads is sometimes called *1:1*, meaning one OS thread per one language thread
     * Many programming languages provide their own special implementation of threads, which are known as *green* threads, and these languages will execute them in the context of a different number of OS threads. For this reason, the green-threaded model is called the *M:N* model
@@ -705,9 +704,68 @@
         handle.join().unwrap();
     }
     ```
+### Message-Passing Concurrency
+* *Message-passing* concurrency is where channels send messages between threads [[ch16-00](https://doc.rust-lang.org/book/ch16-00-concurrency.html)]
+* One increasingly popular approach to ensuring safe concurrency is *message passing*, where threads or actors communicate by sending each other messages containing data. One major tool Rust has for accomplishing message-sending concurrency is the *channel*, a programming concept that Rust's standard library provides an implementation of [[ch16-02](https://doc.rust-lang.org/book/ch16-02-message-passing.html#using-message-passing-to-transfer-data-between-threads)]
+* A channel in programming has two halves: a *transmitter* and a *receiver*. One part of your code calls methods on the transmitter with the data you want to send, and another part checks the receiving end for arriving messages. A channel is said to be *closed* if either the transmitter or receiver half is dropped
+* We create a new channel using the `mpsc::channel` function (`mpsc` stands for *multiple producer, single consumer*), which returns a tuple, the first element of which is the sending end and the second element is the receiving end:
+    ```rust
+    use std::sync::mpsc;
+    use std::thread;
+
+    fn main() {
+        let (tx, rx) = mpsc::channel(); // (transmitter, receiver)
+
+        thread::spawn(move || {
+            let val = String::from("hi");
+            tx.send(val).unwrap();
+        });
+
+        let received = rx.recv().unwrap();
+        println!("Got: {}", received);
+    }
+    ```
+    The `send` method returns a `Result<T, E>` type, so if the receiving end has already been dropped and there's nowhere to send a value, the send operation will return an error.
+* The receiving end of a channel has two useful methods: `recv` and `try_recv`:
+    * `recv` will block the thread's execution and wait until a value is sent down the channel. Once a value is sent, `recv` will return it in a `Result<T, E>`. When the sending end of the channel closes, `recv` will return an error to signal that no more values will be coming
+    * `try_recv` doesn't block, but will instead return a `Result<T, E>` immediately: an `Ok` value holding a message if one is available and an `Err` value if there aren't any messages this time
+### Shared-State Concurrency
+* *Shared-state* concurrency is where multiple threads have access to some piece of data [[ch16-00](https://doc.rust-lang.org/book/ch16-00-concurrency.html)]
+* In a way, channels in any programming language are similar to single ownership, because once you transfer a value down a channel, you should no longer use that value. Shared memory concurrency is like multiple ownership: multiple threads can access the same memory location at the same time [[ch16-03](https://doc.rust-lang.org/book/ch16-03-shared-state.html#shared-state-concurrency)]
+* *Mutexes* have a reputation for being difficult to use because you have to remember two rules:
+    * You must attempt to acquire the lock before using the data
+    * When you're done with the data that the mutex guards, you must unlock the data so other threads can acquire the lock
+
+    Therefore, the mutex is described as *guarding* the data it holds via the locking system [[ch16-03](https://doc.rust-lang.org/book/ch16-03-shared-state.html#using-mutexes-to-allow-access-to-data-from-one-thread-at-a-time)]
+* To access the data inside a `Mutex<T>`, we use the `lock` method to acquire the lock. This call will block the current thread so it can't do any work until it's our turn to have the lock [[ch16-03](https://doc.rust-lang.org/book/ch16-03-shared-state.html#the-api-of-mutext)]:
+    ```rust
+    use std::sync::Mutex;
+
+    fn main() {
+        let m = Mutex::new(5);
+
+        {
+            let mut num = m.lock().unwrap();
+            *num = 6;
+        } // The lock is automatically released here as `num` gets dropped.
+
+        println!("m = {:?}", m);
+    }
+
+    ```
+    The call to `lock` would fail if another thread holding the lock panicked. In that case, no one would ever be able to get the lock, so by using `unwrap` we have this thread panic if we're in that situation.
+* `Mutex<T>` provides interior mutability, as the `Cell` family does. In the same way we use `RefCell<T>` to allow us to mutate contents inside an `Rc<T>`, we use `Mutex<T>` to mutate contents inside an `Arc<T>` [[ch16-03](https://doc.rust-lang.org/book/ch16-03-shared-state.html#similarities-between-refcelltrct-and-mutextarct)]
+* While using `Rc<T>` comes with the risk of creating reference cycles, where two `Rc<T>` values refer to each other (causing memory leaks), similarly, `Mutex<T>` comes with the risk of creating *deadlocks*
+### Sync and Send
+* Two concurrency concepts are embedded in the language: the `std::marker` traits `Sync` and `Send` [[ch16-04](https://doc.rust-lang.org/book/ch16-04-extensible-concurrency-sync-and-send.html)]
+* The `Send` marker trait indicates that ownership of the type implementing `Send` can be transferred between threads
+* Any type composed entirely of `Send` types is automatically marked as `Send` as well. Almost all primitive types are `Send`, aside from raw pointers, and `Rc<T>` is also notably not `Send`
+* The `Sync` marker trait indicates that it is safe for the type implementing `Sync` to be referenced from multiple threads. In other words, any type `T` is `Sync` if `&T` (a reference to `T`) is `Send`, meaning the reference can be sent safely to another thread [[ch16-04](https://doc.rust-lang.org/book/ch16-04-extensible-concurrency-sync-and-send.html#allowing-access-from-multiple-threads-with-sync)]
+* Similarly, primitive types are `Sync`, and types composed entirely of types that are `Sync` are also `Sync`. `Rc<T>` is also not `Sync` for the same reasons that it's not `Send`, and `RefCell<T>` and the family of related `Cell` types aren't either
+* While the implementation of borrow checking that `RefCell<T>` does at runtime is not thread-safe, the smart pointer `Mutex<T>` is `Sync` and can be used to share access with multiple threads
 
 
 <!--
     Next chapter to read:
-    https://doc.rust-lang.org/book/ch16-02-message-passing.html
+    https://doc.rust-lang.org/book/ch17-01-what-is-oo.html
  -->

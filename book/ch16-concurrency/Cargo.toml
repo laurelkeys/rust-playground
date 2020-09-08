@@ -1,5 +1,5 @@
 [package]
-name = "ch15-mock-object"
+name = "ch16-concurrency"
 version = "0.1.0"
 authors = ["tiago"]
 edition = "2018"
