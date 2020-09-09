@@ -102,9 +102,60 @@
     ```
     You can destructure them into their individual pieces, you can use a `.` followed by the index to access an individual value, and so on.
 * You can also define *unit-like structs* that don't have any fields, which behave similarly to `()`, the unit type. They can be useful in situations in which you need to implement a trait on some type but don't have any data that you want to store in the type itself [[ch05-10](https://doc.rust-lang.org/book/ch05-01-defining-structs.html#unit-like-structs-without-any-fields)]
+* You can deestructure structs like [[ch18-03](https://doc.rust-lang.org/book/ch18-03-pattern-syntax.html#destructuring-structs)]:
+    ```rust
+    struct Point {
+        x: i32,
+        y: i32,
+    }
+
+    fn main() {
+        let p = Point { x: 0, y: 7 };
+        let Point { x: a, y: b } = p;
+        assert_eq!(0, a);
+        assert_eq!(7, b);
+
+        let q = Point { x: 1, y: 8 };
+        let Point { x, y } = q;
+        assert_eq!(1, x);
+        assert_eq!(8, y);
+    }
+    ```
+    Which can be used in `match` expressions as well:
+    ```rust
+    match p {
+        Point { x, y: 0 } => println!("On the x axis at {}", x),
+        Point { x: 0, y } => println!("On the y axis at {}", y),
+        Point { x, y } => println!("On neither axis: ({}, {})", x, y),
+    }
+    ```
 
 ## Match
 * A `match` expression is made up of *arms*, which consists of a *pattern* and the code to be run if the value fits that arm's pattern [[ch02-00](https://doc.rust-lang.org/book/ch02-00-guessing-game-tutorial.html#comparing-the-guess-to-the-secret-number)]
+* You can match multiple patterns using the `|` syntax, which means *or* [[ch18-03](https://doc.rust-lang.org/book/ch18-03-pattern-syntax.html#multiple-patterns)]
+* A *match guard* is an additional `if` condition specified after the pattern in an arm that must also match for that arm to be chosen [[ch18-03](https://doc.rust-lang.org/book/ch18-03-pattern-syntax.html#extra-conditionals-with-match-guards)]:
+    ```rust
+    let num = Some(4);
+
+    match num {
+        Some(x) if x < 5 => println!("less than five: {}", x),
+        Some(x) => println!("{}", x),
+        None => (),
+    }
+    ```
+    When combined with `|`, the match guard will apply to *all* patterns:
+    ```rust
+    let x = 4;
+    let y = false;
+
+    match x {
+        4 | 5 | 6 if y => println!("yes"),
+        _ => println!("no"),
+    }
+
+    // "no" is printed.
+    ```
+    is equivalent to `(4 | 5 | 6) if y => ...`, and *not* `4 | 5 | (6 if y) => ...` (which would have printed `"yes"` instead).
 
 ## Types
 * The `isize` and `usize` types size depend on the computer architecture (i.e. 64-bit or 32-bit)
@@ -764,8 +815,112 @@
 * Similarly, primitive types are `Sync`, and types composed entirely of types that are `Sync` are also `Sync`. `Rc<T>` is also not `Sync` for the same reasons that it's not `Send`, and `RefCell<T>` and the family of related `Cell` types aren't either
 * While the implementation of borrow checking that `RefCell<T>` does at runtime is not thread-safe, the smart pointer `Mutex<T>` is `Sync` and can be used to share access with multiple threads
 
+## OOP and Trait Objects
+* There is no way to define a struct that inherits the parent struct's fields and method implementations. However, if you're used to having *inheritance*, you can use other solutions in Rust [[ch17-01](https://doc.rust-lang.org/book/ch17-01-what-is-oo.html#inheritance-as-a-type-system-and-as-code-sharing)]:
+    * If you choose inheritance for reuse of code: you can share Rust code using *default trait method implementations* instead
+    * Another reason relates to the type system: to enable a child type to be used in the same places as the parent type. Instead of providing inheritance, Rust uses generics to abstract over different possible types and trait bounds to impose constraints on what those types must provide (this is sometimes called *bounded parametric polymorphism*)
+* A *trait object* points to both an instance of a type implementing our specified trait as well as a table used to look up trait methods on that type at runtime [[ch17-02](https://doc.rust-lang.org/book/ch17-02-trait-objects.html)]
+* We create a trait object by specifying some sort of pointer, such as a `&` reference or a `Box<T>` smart pointer, then the `dyn` keyword, and then specifying the relevant trait:
+    ```rust
+    pub trait Draw {
+        fn draw(&self);
+    }
+
+    pub struct Screen {
+        pub components: Vec<Box<dyn Draw>>,
+    }
+
+    impl Screen {
+        pub fn run(&self) {
+            for component in self.components.iter() {
+                component.draw();
+            }
+        }
+    }
+    ```
+    `Box<dyn Draw>` is a trait object; it's a stand-in for any type inside a `Box` that implements the `Draw` trait.
+* A generic type parameter can only be substituted with one concrete type at a time, whereas trait objects allow for multiple concrete types to fill in for the trait object at runtime. For instance, if we had defined the `Screen` struct using a generic type and a trait bound:
+    ```rust
+    pub struct Screen<T: Draw> {
+        pub components: Vec<T>,
+    }
+
+    impl<T> Screen<T>
+    where
+        T: Draw,
+    {
+        pub fn run(&self) {
+            for component in self.components.iter() {
+                component.draw();
+            }
+        }
+    }
+    ```
+    This would restrict us to a `Screen` instance that has a homogeneous list of components (i.e. all with the same type).
+* Trait objects are more like objects in other languages in the sense that they combine data and behavior (which `impl` blocks keep separate for enums and structs). But trait objects differ from traditional objects in that we can't add data to a trait object [[ch17-02](https://doc.rust-lang.org/book/ch17-02-trait-objects.html#defining-a-trait-for-common-behavior)]
+* The advantage of using trait objects and Rust's type system to write code similar to code using *duck typing* is that we never have to check whether a value implements a particular method at runtime or worry about getting errors if a value doesn't implement a method but we call it anyway, because the code simply wouldn't compile [[ch17-02](https://doc.rust-lang.org/book/ch17-02-trait-objects.html#implementing-the-trait)]
+* When we use trait bounds on generics the compiler generates nongeneric implementations of functions and methods for each concrete type that we use in place of a generic type parameter. The code that results from monomorphization is doing *static dispatch*, which is when the compiler knows what method you're calling at compile time. This is opposed to *dynamic dispatch*, which is when the compiler can't tell at compile time which method you're calling, and it's what happens when we use trait objects [[ch17-02](https://doc.rust-lang.org/book/ch17-02-trait-objects.html#trait-objects-perform-dynamic-dispatch)]
+* You can only make *object-safe* traits into trait objects, which requires that all methods in the trait have the following properties [[ch17-02](https://doc.rust-lang.org/book/ch17-02-trait-objects.html#object-safety-is-required-for-trait-objects)]:
+    * The return type isn't `Self`
+    * There are no generic type parameters
+
+## Patterns
+* We can mix, match, and nest destructuring patterns in even more complex ways [[ch18-03](https://doc.rust-lang.org/book/ch18-03-pattern-syntax.html#destructuring-structs-and-tuples)]:
+    ```rust
+    let ((feet, inches), Point { x, y }) = ((3, 10), Point { x: 3, y: -10 });
+    ```
+* The underscore (`_`) is a wildcard pattern that will match any value but not bind to it. Although it's especially useful as the last arm in a `match` expression, it can be used in any pattern, including function parameters [[ch18-03](https://doc.rust-lang.org/book/ch18-03-pattern-syntax.html#ignoring-an-entire-value-with-_)]:
+    ```rust
+    fn foo(_: i32, y: i32) {
+        println!("This code only uses the y parameter: {}", y);
+    }
+
+    fn main() {
+        foo(3, 4);
+    }
+    ```
+* There is a subtle difference between using only `_` and using a name that starts with an underscore. The syntax `_x` still binds the value to the variable, whereas `_` doesn't bind at all [[ch18-03](https://doc.rust-lang.org/book/ch18-03-pattern-syntax.html#ignoring-an-unused-variable-by-starting-its-name-with-_)]:
+    ```rust
+    let s = Some(String::from("Hello!"));
+
+    if let Some(_) = s {
+        // `s` isn't moved since `_` doesn't bind to anything.
+        println!("found a string");
+    }
+
+    println!("{:?}", s);
+    ```
+    If we had used `if let Some(_s) = s` instead, `s` would be moved into `_s`, preventing us from using it again in the last line.
+* With values that have many parts, we can use the `..` syntax to use only a few parts and ignore the rest [[ch18-03](https://doc.rust-lang.org/book/ch18-03-pattern-syntax.html#ignoring-remaining-parts-of-a-value-with-)]:
+    ```rust
+    let numbers = (2, 4, 8, 16, 32);
+
+    match numbers {
+        (first, .., last) => {
+            println!("Some numbers: {}, {}", first, last);
+        }
+    }
+    ```
+* The *at* operator (`@`) lets us create a variable that holds a value at the same time we're testing that value to see whether it matches a pattern [[ch18-03](https://doc.rust-lang.org/book/ch18-03-pattern-syntax.html#-bindings)]:
+    ```rust
+    enum Message {
+        Hello { id: i32 },
+    }
+
+    let msg = Message::Hello { id: 5 };
+
+    match msg {
+        Message::Hello {
+            id: id_variable @ 3..=7,
+        } => println!("Found an id in range: {}", id_variable),
+        Message::Hello { id: 10..=12 } => println!("Found an id in another range"),
+        Message::Hello { id } => println!("Found some other id: {}", id),
+    }
+    ```
+    By specifying `id_variable @` before the range `3..=7`, we're capturing whatever value matched the range while also testing that the value matched the range pattern.
+
 
 <!--
     Next chapter to read:
-    https://doc.rust-lang.org/book/ch17-01-what-is-oo.html
+    https://doc.rust-lang.org/book/ch19-01-unsafe-rust.html
  -->
