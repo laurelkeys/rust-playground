@@ -2,6 +2,7 @@
 * A crate is a collection of Rust source code files
 * Running `cargo doc --open` will build the documentation provided by all of your dependencies (locally) and open it in the browser [[ch02-00](https://doc.rust-lang.org/book/ch02-00-guessing-game-tutorial.html#generating-a-random-number)]
 
+
 ## Functions
 * The `::` syntax in `::new` indicates that `new` is an *associated function* of the `String` type:
     ```rust
@@ -43,6 +44,81 @@
     p1.distance(&p2);
     (&p1).distance(&p2); // equivalent to the above
     ```
+* Nothing prevents a trait from having a method with the same name as another trait's method, nor from implementing both traits on one type. It's also possible to implement a method directly on the type with the same name as methods from traits [[ch19-03](https://doc.rust-lang.org/book/ch19-03-advanced-traits.html#fully-qualified-syntax-for-disambiguation-calling-methods-with-the-same-name)]:
+    ```rust
+    trait Pilot {
+        fn fly(&self);
+    }
+
+    trait Wizard {
+        fn fly(&self);
+    }
+
+    struct Human;
+
+    impl Pilot for Human {
+        fn fly(&self) { println!("This is your captain speaking."); }
+    }
+
+    impl Wizard for Human {
+        fn fly(&self) { println!("Up!"); }
+    }
+
+    impl Human {
+        fn fly(&self) { println!("*waving arms furiously*"); }
+    }
+    ```
+    When we call fly on an instance of `Human`, the compiler defaults to calling the method that is directly implemented on the type:
+    ```rust
+    fn main() {
+        let person = Human;
+        person.fly(); // prints "*waving arms furiously*"
+    }
+    ```
+    To call the `fly` methods from either the `Pilot` trait or the `Wizard` trait, we need to use more explicit syntax:
+    ```rust
+    fn main() {
+        let person = Human;
+        Pilot::fly(&person);  // prints "This is your captain speaking."
+        Wizard::fly(&person); // prints "Up!"
+        person.fly();         // prints "*waving arms furiously*"
+    }
+    ```
+    Because the  `fly` method takes a  `self` parameter, if we had two *types* that both implement one *trait*, Rust could figure out which implementation of a trait to use based on the type of  `self`.
+* However, associated functions that are part of traits don't have a `self` parameter. When two types in the same scope implement that trait, Rust can't figure out which type you mean unless you use *fully qualified syntax*:
+    ```rust
+    trait Animal {
+        fn baby_name() -> String;
+    }
+
+    struct Dog;
+
+    impl Dog {
+        fn baby_name() -> String { String::from("Spot") }
+    }
+
+    impl Animal for Dog {
+        fn baby_name() -> String { String::from("puppy") }
+    }
+
+    fn main() {
+        println!(
+            "A baby dog is called a {}",
+            Dog::baby_name() // prints "Spot"
+        );
+    }
+    ```
+    Note that, if we tried using `Animal::baby_name()` we would get a compilation error. To use the `baby_name` method from the `Animal` trait as implemented on `Dog` we'd need to write:
+    ```rust
+    fn main() {
+        println!(
+            "A baby dog is called a {}",
+            <Dog as Animal>::baby_name() // prints "puppy"
+        );
+    }
+    ```
+* In general, fully qualified syntax is defined as: `<Type as Trait>::function(receiver_if_method, next_arg, ...);`
+
 
 ## Enums
 * The values of an enum(eration) are called *variants* [[ch02-00](https://doc.rust-lang.org/book/ch02-00-guessing-game-tutorial.html)]
@@ -75,6 +151,7 @@
         ChangeColor(i32, i32, i32), // includes three `i32` values
     }
     ```
+
 
 ## Structs
 * To create a new instance of a struct that uses most of an old instance's values we can use the *struct update syntax* [[ch05-01](https://doc.rust-lang.org/book/ch05-01-defining-structs.html#creating-instances-from-other-instances-with-struct-update-syntax)]:
@@ -130,6 +207,7 @@
     }
     ```
 
+
 ## Match
 * A `match` expression is made up of *arms*, which consists of a *pattern* and the code to be run if the value fits that arm's pattern [[ch02-00](https://doc.rust-lang.org/book/ch02-00-guessing-game-tutorial.html#comparing-the-guess-to-the-secret-number)]
 * You can match multiple patterns using the `|` syntax, which means *or* [[ch18-03](https://doc.rust-lang.org/book/ch18-03-pattern-syntax.html#multiple-patterns)]
@@ -157,6 +235,7 @@
     ```
     is equivalent to `(4 | 5 | 6) if y => ...`, and *not* `4 | 5 | (6 if y) => ...` (which would have printed `"yes"` instead).
 
+
 ## Types
 * The `isize` and `usize` types size depend on the computer architecture (i.e. 64-bit or 32-bit)
 * Signed integer types are stored using two's complement notation [[ch03-03](https://doc.rust-lang.org/book/ch03-02-data-types.html#integer-types)]
@@ -167,6 +246,7 @@
 * *Tuples* have fixed length and can contain values of different types [[ch03-02](https://doc.rust-lang.org/book/ch03-02-data-types.html#the-tuple-type)]
 * *Arrays* have fixed length but all its elements must have the same type, they're useful to allocate data on the stack or to ensure that you always have a fixed number of elements [[ch03-02](https://doc.rust-lang.org/book/ch03-02-data-types.html#the-array-type)]
 * Rust checks for (and *panics* on) out of bounds indices for arrays [[ch03-02](https://doc.rust-lang.org/book/ch03-02-data-types.html#invalid-array-element-access)]
+
 
 ## Control Flow
 * A `loop` block can return a value by placing it after a `break` expression [[ch03-05](https://doc.rust-lang.org/book/ch03-05-control-flow.html#returning-values-from-loops)]:
@@ -191,6 +271,7 @@
         println!("{}!", number);
     }
     ```
+
 
 ## Ownership
 * Memory is managed through a system of ownership with a set of rules that the compiler checks at compile time [[ch04-01](https://doc.rust-lang.org/book/ch04-01-what-is-ownership.html#ownership-rules)]:
@@ -231,6 +312,7 @@
     let r3 = &mut s; // no problem
     println!("{}", r3);
     ```
+
 
 ## Module System
 * The idiomatic way of bringing a function into scope with `use` is to keep its parent, so that we have to specify the parent module when calling the function. This makes it clear that the function isn't locally defined while still minimizing repetition of the full path [[ch07-04](https://doc.rust-lang.org/book/ch07-04-bringing-paths-into-scope-with-the-use-keyword.html#creating-idiomatic-use-paths)]:
@@ -281,6 +363,7 @@
     ```
 * When a name is brought into scope with `use`, the name available in the new scope is private. To enable the code that calls our code to refer to it as if it was defined in that code's scope, we can combine `pub` and `use`. This technique is called *re-exporting* [[ch07-04](https://doc.rust-lang.org/book/ch07-04-bringing-paths-into-scope-with-the-use-keyword.html#re-exporting-names-with-pub-use)]
 
+
 ## Vector
 * Example of iterating over a *vector* with immutable vs. mutable references [[ch08-01](https://doc.rust-lang.org/book/ch08-01-vectors.html#iterating-over-the-values-in-a-vector)]:
     ```rust
@@ -291,6 +374,7 @@
     for i in &mut v { *i += 50; }
     ```
     Note that, to change the value that the mutable reference refers to, we use the dereference operator (`*`).
+
 
 ## Strings
 * For any type that implements the `Display` trait we can convert it into a `String` in two ways [[ch08-02](https://doc.rust-lang.org/book/ch08-02-strings.html)]:
@@ -349,6 +433,7 @@
     ```
     Getting grapheme clusters from strings is complex though, so this functionality is not provided by the standard library.
 
+
 ## Hash Map
 * Another way of constructing a hash map is by using iterators and the collect method on a vector of tuples, where each tuple consists of a key and its value [[ch08-03](https://doc.rust-lang.org/book/ch08-03-hash-maps.html#creating-a-new-hash-map)]:
     ```rust
@@ -401,6 +486,7 @@
 
     println!("{:?}", map); // prints: {"world": 2, "hello": 1, "wonderful": 1}
     ```
+
 
 ## Traits
 * To define a function which takes some type with a given trait as a parameter we can use the `impl Trait` syntax [[ch10-02](https://doc.rust-lang.org/book/ch10-02-traits.html#traits-as-parameters)]:
@@ -468,6 +554,96 @@
         // ...
     }
     ```
+* When we use generic type parameters, we can specify a default concrete type for the generic type, with the syntax `<PlaceholderType=ConcreteType>` [[ch19-03](https://doc.rust-lang.org/book/ch19-03-advanced-traits.html#default-generic-type-parameters-and-operator-overloading)]:
+    ```rust
+    use std::ops::Add;
+
+    #[derive(Debug, PartialEq)]
+    struct Point { x: i32, y: i32, }
+
+    impl Add for Point {
+        type Output = Point;
+
+        fn add(self, other: Point) -> Point {
+            Point { x: self.x + other.x, y: self.y + other.y, }
+        }
+    }
+
+    fn main() {
+        assert_eq!(
+            Point { x: 1, y: 0 } + Point { x: 2, y: 3 },
+            Point { x: 3, y: 3 }
+        );
+    }
+    ```
+    The default generic type in this code is within the `Add` trait, here's its definition:
+    ```rust
+    trait Add<Rhs=Self> {
+        type Output;
+
+        fn add(self, rhs: Rhs) -> Self::Output;
+    }
+    ```
+    Here's an example of implementing the `Add` trait where we want to customize the `Rhs` type rather than using the default:
+    ```rust
+    use std::ops::Add;
+
+    struct Millimeters(u32);
+    struct Meters(u32);
+
+    impl Add<Meters> for Millimeters {
+        type Output = Millimeters;
+
+        fn add(self, other: Meters) -> Millimeters {
+            Millimeters(self.0 + (other.0 * 1000))
+        }
+    }
+    ```
+* *Associated types* connect a type placeholder with a trait such that the trait method definitions can use these placeholder types in their signatures [[ch19-03](https://doc.rust-lang.org/book/ch19-03-advanced-traits.html)]
+* One example of a trait with an associated type is the `Iterator` trait that the standard library provides. The associated type is named `Item` and stands in for the type of the values the type implementing the `Iterator` trait is iterating over:
+    ```rust
+    pub trait Iterator {
+        type Item;
+
+        fn next(&mut self) -> Option<Self::Item>;
+    }
+    ```
+* Sometimes, you might need one trait to use another trait's functionality. In this case, you need to rely on the dependent trait also being implemented, which is called a *supertrait* of the trait you're implementing [[ch19-03](https://doc.rust-lang.org/book/ch19-03-advanced-traits.html#using-supertraits-to-require-one-traits-functionality-within-another-trait)]:
+    ```rust
+    use std::fmt;
+
+    trait OutlinePrint: fmt::Display {
+        fn outline_print(&self) {
+            let output = self.to_string();
+            let len = output.len();
+            println!("{}", "*".repeat(len + 4));
+            println!("*{}*", " ".repeat(len + 2));
+            println!("* {} *", output);
+            println!("*{}*", " ".repeat(len + 2));
+            println!("{}", "*".repeat(len + 4));
+        }
+    }
+    ```
+    Because we've specified that `OutlinePrint` requires the `Display` trait, we can use the `to_string` function that is automatically implemented for any type that implements `Display`.
+* While we can't implement external traits on external types (*orphan rule*), it's possible to get around this restriction using the *newtype pattern*, which involves creating a new type in a tuple struct [[ch19-03](https://doc.rust-lang.org/book/ch19-03-advanced-traits.html#using-the-newtype-pattern-to-implement-external-traits-on-external-types)]:
+    ```rust
+    use std::fmt;
+
+    struct Wrapper(Vec<String>);
+
+    impl fmt::Display for Wrapper {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            write!(f, "[{}]", self.0.join(", "))
+        }
+    }
+
+    fn main() {
+        let w = Wrapper(vec![String::from("hello"), String::from("world")]);
+        println!("w = {}", w);
+    }
+    ```
+    There is no runtime performance penalty for using this pattern, and the wrapper type is elided at compile time.
+
 
 ## Lifetimes
 * Lifetime annotations describe the relationships of the lifetimes of multiple references to each other without affecting the lifetimes [[ch10-03](https://doc.rust-lang.org/book/ch10-03-lifetime-syntax.html#lifetime-annotation-syntax)]
@@ -534,6 +710,7 @@
     After working through all three rules, we still couldn't figure out what the return type's lifetime is, hence why this gives a compiler error.
 * One special lifetime is `'static`, which means that this reference *can* live for the entire duration of the program [[ch10-03](https://doc.rust-lang.org/book/ch10-03-lifetime-syntax.html#the-static-lifetime)]
 
+
 ## Tests
 * You can use the `Result<T, E>` type as a return for test functions instead of panicking, so that you can use the question mark operator in the body of tests [[ch11-01](https://doc.rust-lang.org/book/ch11-01-writing-tests.html#using-resultt-e-in-tests)]
 * Some command line options go to `cargo test`, and some go to the resulting test binary. To separate these two types of arguments, you list the arguments that go to `cargo test` followed by the separator `--` and then the ones that go to the test binary [[ch11-02](https://doc.rust-lang.org/book/ch11-02-running-tests.html#controlling-how-tests-are-run)]
@@ -566,6 +743,7 @@
     * If our project is a binary crate that only contains a *src/main.rs* file and doesn't have a *src/lib.rs* file, we can't create integration tests in the tests directory and bring functions defined in the *src/main.rs* file into scope with a use statement. Only library crates expose functions that other crates can use; binary crates are meant to be run on their own [[ch11-03](https://doc.rust-lang.org/book/ch11-03-test-organization.html#integration-tests-for-binary-crates)]
     * This is one of the reasons Rust projects that provide a binary have a straightforward *src/main.rs* file that calls logic that lives in the *src/lib.rs* file. Using that structure, integration tests can test the library crate with `use` to make the important functionality available
 
+
 ## Iterators
 * Iterators are *lazy*, meaning they have no effect until you call methods that consume the iterator to use it up [[ch13-02](https://doc.rust-lang.org/book/ch13-02-iterators.html#processing-a-series-of-items-with-iterators)]
 * All iterators implement the `Iterator` trait, defined in the standard library, which looks like [[ch13-02](https://doc.rust-lang.org/book/ch13-02-iterators.html#processing-a-series-of-items-with-iterators)]:
@@ -596,6 +774,7 @@
 * Methods that call next are called *consuming adaptors*, because calling them uses up the iterator [[ch13-02](https://doc.rust-lang.org/book/ch13-02-iterators.html#methods-that-consume-the-iterator)]
 * Other methods defined on the `Iterator` trait, known as *iterator adaptors*, allow you to change iterators into different kinds of iterators. You can chain multiple calls to iterator adaptors to perform complex actions in a readable way [[ch13-20](https://doc.rust-lang.org/book/ch13-02-iterators.html#methods-that-produce-other-iterators)]
 
+
 ## Documentation
 * Documentation comments use three slashes, `///`, instead of two and support Markdown notation for formatting the text. Place documentation comments just before the item they're documenting [[ch14-02](https://doc.rust-lang.org/book/ch14-02-publishing-to-crates-io.html#making-useful-documentation-comments)]:
     ```rust
@@ -616,6 +795,7 @@
     Besides "Examples", other commonly used sections are "Panics", "Errors" and "Safety" [[ch14-02](https://doc.rust-lang.org/book/ch14-02-publishing-to-crates-io.html#commonly-used-sections)]
 * Running `cargo test` will run the code examples in your documentation as tests [[ch14-02](https://doc.rust-lang.org/book/ch14-02-publishing-to-crates-io.html#documentation-comments-as-tests)]
 * Another style of doc comment, `//!`, adds documentation to the item that contains the comments rather than adding documentation to the items following the comments. We typically use these doc comments inside the crate root file (*src/lib.rs* by convention) or inside a module to document the crate or the module as a whole [[ch14-02](https://doc.rust-lang.org/book/ch14-02-publishing-to-crates-io.html#commenting-contained-items)]
+
 
 ## Smart Pointers
 * In Rust, which uses the concept of ownership and borrowing, an additional difference between references and smart pointers is that references are pointers that only borrow data; in contrast, in many cases, smart pointers *own* the data they point to [[ch15-00](https://doc.rust-lang.org/book/ch15-00-smart-pointers.html)]
@@ -682,6 +862,7 @@
 * You can also create a *weak reference* to the value within an `Rc<T>` instance by calling `Rc::downgrade` and passing a reference to it, which returns a smart pointer of type `Weak<T>` [[ch15-06](https://doc.rust-lang.org/book/ch15-06-reference-cycles.html#preventing-reference-cycles-turning-an-rct-into-a-weakt)]
 * Instead of increasing the `strong_count` in the `Rc<T>` instance by 1, calling `Rc::downgrade` increases the `weak_count` by 1, which doesn't need to be 0 for the `Rc<T>` instance to be cleaned up
 * Because the value that `Weak<T>` references might have been dropped, to do anything with the value it's pointing to you must make sure the value still exists. You do this by calling the `upgrade` method on a `Weak<T>` instance, which will return an `Option<Rc<T>>`
+
 
 ## Fearless Concurrency
 * *Concurrent programming* is where different parts of a program execute independently, and *parallel programming* is where different parts of a program execute at the same time [[ch16-00](https://doc.rust-lang.org/book/ch16-00-concurrency.html)]
@@ -815,6 +996,7 @@
 * Similarly, primitive types are `Sync`, and types composed entirely of types that are `Sync` are also `Sync`. `Rc<T>` is also not `Sync` for the same reasons that it's not `Send`, and `RefCell<T>` and the family of related `Cell` types aren't either
 * While the implementation of borrow checking that `RefCell<T>` does at runtime is not thread-safe, the smart pointer `Mutex<T>` is `Sync` and can be used to share access with multiple threads
 
+
 ## OOP and Trait Objects
 * There is no way to define a struct that inherits the parent struct's fields and method implementations. However, if you're used to having *inheritance*, you can use other solutions in Rust [[ch17-01](https://doc.rust-lang.org/book/ch17-01-what-is-oo.html#inheritance-as-a-type-system-and-as-code-sharing)]:
     * If you choose inheritance for reuse of code: you can share Rust code using *default trait method implementations* instead
@@ -863,6 +1045,7 @@
 * You can only make *object-safe* traits into trait objects, which requires that all methods in the trait have the following properties [[ch17-02](https://doc.rust-lang.org/book/ch17-02-trait-objects.html#object-safety-is-required-for-trait-objects)]:
     * The return type isn't `Self`
     * There are no generic type parameters
+
 
 ## Patterns
 * We can mix, match, and nest destructuring patterns in even more complex ways [[ch18-03](https://doc.rust-lang.org/book/ch18-03-pattern-syntax.html#destructuring-structs-and-tuples)]:
@@ -920,7 +1103,97 @@
     By specifying `id_variable @` before the range `3..=7`, we're capturing whatever value matched the range while also testing that the value matched the range pattern.
 
 
+## Unsafe Rust
+* You can take five actions in unsafe Rust, called *unsafe superpowers*, that you can't in safe Rust [[ch19-01](https://doc.rust-lang.org/book/ch19-01-unsafe-rust.html#unsafe-superpowers)]:
+    * Dereference a raw pointer
+    * Call an unsafe function or method
+    * Access or modify a mutable static variable
+    * Implement an unsafe trait
+    * Access fields of `union`s
+
+    Note that `unsafe` doesn't turn off the borrow checker or disable any other of Rust's safety checks, it only gives you access to these five features that are then not checked by the compiler for memory safety.
+* As with references, *raw pointers* can be immutable (i.e. the pointer can't be directly assigned to after being dereferenced) or mutable and are written as `*const T` and `*mut T`, respectively [[ch19-01](https://doc.rust-lang.org/book/ch19-01-unsafe-rust.html#dereferencing-a-raw-pointer)]:
+    ```rust
+    let mut num = 5;
+
+    let r1 = &num as *const i32;
+    let r2 = &mut num as *mut i32;
+    ```
+    Notice that we can create raw pointers in safe code; we just can't *dereference* them outside an `unsafe` block:
+    ```rust
+    unsafe {
+        println!("r1 is: {}", *r1);
+        println!("r2 is: {}", *r2);
+    }
+    ```
+* Different from references and smart pointers, raw pointers:
+    * Are allowed to ignore the borrowing rules by having both immutable and mutable pointers or multiple mutable pointers to the same location
+    * Aren't guaranteed to point to valid memory
+    * Are allowed to be null
+    * Don't implement any automatic cleanup
+* Bodies of unsafe functions are effectively `unsafe` blocks, so to perform other unsafe operations within an unsafe function, we don't need to add another `unsafe` block. However, we don't usually need to mark the whole function as unsafe; wrapping unsafe code in a safe function is a common abstraction [[ch19-01](https://doc.rust-lang.org/book/ch19-01-unsafe-rust.html#creating-a-safe-abstraction-over-unsafe-code)]
+* Rust has a keyword, `extern`, that facilitates the creation and use of a *Foreign Function Interface (FFI)* [[ch19-01](https://doc.rust-lang.org/book/ch19-01-unsafe-rust.html#using-extern-functions-to-call-external-code)]:
+    ```rust
+    extern "C" {
+        fn abs(input: i32) -> i32;
+    }
+
+    fn main() {
+        unsafe {
+            println!("Absolute value of -3 according to C: {}", abs(-3));
+        }
+    }
+    ```
+    We can also use `extern` to create an interface that allows other languages to call Rust functions (this usage does not require `unsafe`) [[ch19-01](https://doc.rust-lang.org/book/ch19-01-unsafe-rust.html#calling-rust-functions-from-other-languages)]:
+    ```rust
+    #[no_mangle]
+    pub extern "C" fn call_from_c() {
+        println!("Just called a Rust function from C!");
+    }
+    ```
+* In Rust, global variables are called *static* variables, and they can only store references with the `'static` lifetime [[ch19-01](https://doc.rust-lang.org/book/ch19-01-unsafe-rust.html#accessing-or-modifying-a-mutable-static-variable)]:
+    ```rust
+    static HELLO_WORLD: &str = "Hello, world!";
+
+    fn main() {
+        println!("name is: {}", HELLO_WORLD);
+    }
+    ```
+    Constants and immutable static variables might seem similar, but a subtle difference is that values in a static variable have a fixed address in memory. Constants, on the other hand, are allowed to duplicate their data whenever they're used.
+
+    Another difference is that static variables can be mutable, but accessing and modifying mutable static variables is *unsafe*:
+    ```rust
+    static mut COUNTER: u32 = 0;
+
+    fn add_to_count(inc: u32) {
+        unsafe {
+            COUNTER += inc;
+        }
+    }
+
+    fn main() {
+        add_to_count(3);
+
+        unsafe {
+            println!("COUNTER: {}", COUNTER);
+        }
+    }
+    ```
+    With mutable data that is globally accessible, it's difficult to ensure there are no data races, which is why Rust considers mutable static variables to be unsafe.
+* A trait is unsafe when at least one of its methods has some invariant that the compiler can't verify [[ch19-01](https://doc.rust-lang.org/book/ch19-01-unsafe-rust.html#implementing-an-unsafe-trait)]:
+    ```rust
+    unsafe trait Foo {
+        // Methods go here...
+    }
+
+    unsafe impl Foo for i32 {
+        // Method implementations go here...
+    }
+    ```
+
+
+
 <!--
     Next chapter to read:
-    https://doc.rust-lang.org/book/ch19-01-unsafe-rust.html
+    https://doc.rust-lang.org/book/ch19-04-advanced-types.html
  -->
