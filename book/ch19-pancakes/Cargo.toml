@@ -1,0 +1,11 @@
+[package]
+name = "ch19-pancakes"
+version = "0.1.0"
+authors = ["tiago"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+ch19-hello-macro = { path = "../ch19-hello-macro" }
+hello-macro-derive = { path = "../ch19-hello-macro/hello-macro-derive" }

@@ -3,7 +3,7 @@
 * Running `cargo doc --open` will build the documentation provided by all of your dependencies (locally) and open it in the browser [[ch02-00](https://doc.rust-lang.org/book/ch02-00-guessing-game-tutorial.html#generating-a-random-number)]
 
 
-## Functions
+## Functions and Closures
 * The `::` syntax in `::new` indicates that `new` is an *associated function* of the `String` type:
     ```rust
     String::new()
@@ -35,6 +35,28 @@
     }
     ```
     This technique is mostly useful when passing a closure to a new thread to move the data so it's owned by the new thread
+* Functions coerce to the type `fn` (with a lowercase f), not to be confused with the `Fn` closure trait. The `fn` type is called a *function pointer*, and the syntax for specifying a parameter of this type is similar to that of closures:
+    ```rust
+    fn add_one(x: i32) -> i32 {
+        x + 1
+    }
+
+    fn do_twice(f: fn(i32) -> i32, arg: i32) -> i32 {
+        f(arg) + f(arg)
+    }
+
+    fn main() {
+        let answer = do_twice(add_one, 5);
+        println!("The answer is: {}", answer); // prints "The answer is: 12"
+    }
+    ```
+    Function pointers implement all three of the closure traits (`Fn`, `FnMut`, and `FnOnce`).
+* Closures are represented by traits, which means you can't return closures directly. You can, however, use a trait object for it [[ch19-05](https://doc.rust-lang.org/book/ch19-05-advanced-functions-and-closures.html#returning-closures)]:
+    ```rust
+    fn returns_closure() -> Box<dyn Fn(i32) -> i32> {
+        Box::new(|x| x + 1)
+    }
+    ```
 
 
 ## Methods
@@ -246,6 +268,23 @@
 * *Tuples* have fixed length and can contain values of different types [[ch03-02](https://doc.rust-lang.org/book/ch03-02-data-types.html#the-tuple-type)]
 * *Arrays* have fixed length but all its elements must have the same type, they're useful to allocate data on the stack or to ensure that you always have a fixed number of elements [[ch03-02](https://doc.rust-lang.org/book/ch03-02-data-types.html#the-array-type)]
 * Rust checks for (and *panics* on) out of bounds indices for arrays [[ch03-02](https://doc.rust-lang.org/book/ch03-02-data-types.html#invalid-array-element-access)]
+* Rust has a special type named `!` that's known in type theory lingo as the *empty type* because it has no values. However, it's usually called the *never type* in Rust because it stands in the place of the return type when a function will never return [[ch19-04](https://doc.rust-lang.org/book/ch19-04-advanced-types.html#the-never-type-that-never-returns)]:
+    ```rust
+    fn bar() -> ! {
+        // ...
+    }
+    ```
+    Functions that return never are called *diverging functions*.
+* *Dynamically sized types*, sometimes referred to as *DSTs* or *unsized types*, let us write code using values whose size we can know only at runtime [[ch19-04](https://doc.rust-lang.org/book/ch19-04-advanced-types.html#dynamically-sized-types-and-the-sized-trait)]
+* The golden rule of DSTs is that we must always put values of dynamically sized types behind a pointer of some kind. For instance, `str` is a DST but `&str` is not (its composed of two values: the address of the `str` and its length, so we always know its size to be twice the length of a `usize`)
+* Rust has a particular trait called `Sized` to determine whether or not a type's size is known at compile time, which is automatically implemented for everything whose size is known. In addition, Rust implicitly adds a bound on `Sized` to every generic function:
+    ```rust
+    fn generic<T>(t: T) { /* ... */ }
+    ```
+    is actually treated as:
+    ```rust
+    fn generic<T: Sized>(t: T) { /* ... */ }
+    ```
 
 
 ## Control Flow
@@ -1191,9 +1230,67 @@
     }
     ```
 
+## Macros
+* The term *macro* refers to a family of features in Rust: *declarative* macros with `macro_rules!` and three kinds of *procedural* macros [[ch19-06](https://doc.rust-lang.org/book/ch19-06-macros.html)]:
+    * Custom `#[derive]` macros that specify code added with the `derive` attribute used on structs and enums
+    * Attribute-like macros that define custom attributes usable on any item
+    * Function-like macros that look like function calls but operate on the tokens specified as their argument
+* A function signature must declare the number and type of parameters the function has. Macros, on the other hand, can take a variable number of parameters
+* Another important difference between macros and functions is that you must define macros or bring them into scope *before* you call them in a file, as opposed to functions you can define anywhere and call anywhere
+### Declarative Macros
+* To define a "`macro_rules!` macro" ("macros by example", or just plain "macro"), you use the `macro_rules!` construct. As an example, consider the `vec!` macro"to create a new vector with particular values [[ch19-06](https://doc.rust-lang.org/book/ch19-06-macros.html#declarative-macros-with-macro_rules-for-general-metaprogramming)]:
+    ```rust
+    let v: Vec<u32> = vec![1, 2, 3];
+    ```
+    Below is a slightly simplified definition of the `vec!` macro:
+    ```rust
+    #[macro_export]
+    macro_rules! vec {
+        ( $( $x:expr ),* ) => {
+            {
+                let mut temp_vec = Vec::new();
+                $(
+                    temp_vec.push($x);
+                )*
+                temp_vec
+            }
+        };
+    }
+    ```
+    For a throughout explanation of it, see [the corresponding chapter section](https://doc.rust-lang.org/book/ch19-06-macros.html#declarative-macros-with-macro_rules-for-general-metaprogramming).
+
+    For the full macro pattern syntax, see [the reference](https://doc.rust-lang.org/reference/macros-by-example.html).
+
+    When we call this macro with `vec![1, 2, 3];`, the code generated that replaces this macro call will be the following:
+    ```rust
+    {
+        let mut temp_vec = Vec::new();
+        temp_vec.push(1);
+        temp_vec.push(2);
+        temp_vec.push(3);
+        temp_vec
+    }
+    ```
+### Procedural Macros
+* Procedural macros accept some code as an input, operate on that code, and produce some code as an output rather than matching against patterns and replacing the code with other code as declarative macros do [[ch19-06](https://doc.rust-lang.org/book/ch19-06-macros.html#procedural-macros-for-generating-code-from-attributes)]
+* The three kinds of procedural macros (custom derive, attribute-like, and function-like) all work in a similar fashion. When creating procedural macros, the definitions must reside in their own crate with a special crate type
+* Using them looks like the code below, where `some_attribute` is a placeholder for using a specific macro:
+    ```rust
+    use proc_macro;
+
+    #[some_attribute]
+    pub fn some_name(input: TokenStream) -> TokenStream {
+    }
+    ```
+    The function that defines a procedural macro takes a `TokenStream` (represents a sequence of tokens) as an input and produces a `TokenStream` as an output.
+
+    This is the core of the macro: the source code that the macro is operating on makes up the input `TokenStream`, and the code the macro produces is the output `TokenStream`.
+* At the time of this writing, procedural macros need to be in their own crate. Eventually, this restriction might be lifted. The convention for structuring crates and macro crates is as follows: for a crate named `foo`, a custom derive procedural macro crate is called `foo_derive` [[ch19-06](https://doc.rust-lang.org/book/ch19-06-macros.html#how-to-write-a-custom-derive-macro)]
+* Attribute-like macros are similar to custom derive macros, but instead of generating code for the `derive` attribute, they allow you to create new attributes. They're also more flexible: `derive` only works for structs and enums; attributes can be applied to other items as well, such as functions [[ch19-06](https://doc.rust-lang.org/book/ch19-06-macros.html#attribute-like-macros)]
+* Function-like macros define macros that look like function calls. Similarly to `macro_rules!` macros, they're more flexible than functions; for example, they can take an unknown number of arguments. However, `macro_rules!` macros can be defined only using the match-like syntax shown above, while function-like macros take a `TokenStream` parameter and their definition manipulates that `TokenStream` using Rust code as the other two types of procedural macros do [[ch19-06](https://doc.rust-lang.org/book/ch19-06-macros.html#function-like-macros)]
 
 
 <!--
     Next chapter to read:
-    https://doc.rust-lang.org/book/ch19-04-advanced-types.html
+    https://doc.rust-lang.org/book/ch20-01-single-threaded.html
  -->

@@ -31,6 +31,10 @@ fn is_vowel(c: &char) -> bool {
     "aeiou".contains(&c.to_lowercase().to_string())
 }
 
+//
+// Test functions.
+//
+
 #[cfg(test)]
 mod test {
     use super::*;
