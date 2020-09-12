@@ -1292,5 +1292,5 @@
 
 <!--
     Next chapter to read:
-    https://doc.rust-lang.org/book/ch20-02-multithreaded.html
+    https://doc.rust-lang.org/book/ch20-03-graceful-shutdown-and-cleanup.html
  -->
