@@ -11,18 +11,20 @@ fn main() {
     let listener = TcpListener::bind("127.0.0.1:7878").unwrap();
     let pool = ThreadPool::new(4);
 
-    for stream in listener.incoming() {
+    // Shutdown after two requests.
+    for stream in listener.incoming().take(2) {
         let stream = stream.unwrap();
 
         pool.execute(|| {
             handle_connection(stream).unwrap();
         });
     }
+
+    println!("Shutting down.");
 }
 
 fn handle_connection(mut stream: TcpStream) -> std::io::Result<()> {
     let mut buffer = [0; 1024];
-
     let _n = stream.read(&mut buffer)?;
 
     // HTTP request format:

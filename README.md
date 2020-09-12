@@ -3,7 +3,29 @@
 Trying out this Rust thing... let's see how it goes 🦀
 
 ## `book/`
-Notes on [_the book_](https://doc.rust-lang.org/book/) "The Rust Programming Language". 🚧 WIP 🚧
+Notes on [_the_ book](https://doc.rust-lang.org/book/) "The Rust Programming Language", together with code examples.
+
+```bash
+.
+├── ch02-guessing-game/
+├── ch03-fibonacci/
+├── ch08-mean-median-mode/
+├── ch08-pig-latin/
+├── ch12-grep/
+├── ch14-add/
+├── ch14-art/
+├── ch15-cons-list/
+├── ch15-mock-object/
+├── ch15-weak-ref-tree/
+├── ch16-concurrency/
+├── ch17-blog/
+├── ch17-gui/
+├── ch19-hello-macro/
+├── ch19-pancakes/
+├── ch20-hello/
+│
+└── notes.md            # complete notes
+```
 
 ## `lrtdw/`
 Following [Cliff L. Biffle](http://cliffle.com/about/)'s `unsafe`-first approach to "[Learn Rust the Dangerous Way](http://cliffle.com/p/dangerust/)" (LRtDW) series of articles.

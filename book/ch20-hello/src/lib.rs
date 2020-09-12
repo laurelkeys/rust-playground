@@ -5,10 +5,15 @@ use std::thread;
 
 pub struct ThreadPool {
     workers: Vec<Worker>,
-    sender: mpsc::Sender<Job>,
+    sender: mpsc::Sender<Message>,
 }
 
 type Job = Box<dyn FnOnce() + Send + 'static>;
+
+enum Message {
+    NewJob(Job), // holds the `Job` the thread should run
+    Terminate,   // causes the thread to exit its loop and stop
+}
 
 impl ThreadPool {
     /// Create a new ThreadPool.
@@ -45,42 +50,85 @@ impl ThreadPool {
     {
         let job = Box::new(f);
 
-        self.sender.send(job).unwrap();
+        self.sender.send(Message::NewJob(job)).unwrap();
+    }
+}
+
+impl Drop for ThreadPool {
+    fn drop(&mut self) {
+        // @Note: to prevent a deadlock scenario, we first put all
+        // of our `Terminate` messages on the channel in one loop;
+        // then we join on all the threads in another loop.
+        //
+        // Each worker will stop receiving requests on the channel once
+        // it gets a terminate message. So, we can be sure that if we send
+        // the same number of terminate messages as there are workers, each
+        // worker will receive a terminate message before `join` is called on its thread.
+
+        println!("Sending terminate message to all workers.");
+
+        for _ in &self.workers {
+            self.sender.send(Message::Terminate).unwrap();
+        }
+
+        println!("Shutting down all workers.");
+
+        for worker in &mut self.workers {
+            println!("Shutting down worker {}", worker.id);
+
+            if let Some(thread) = worker.thread.take() {
+                thread.join().unwrap();
+            }
+        }
     }
 }
 
 struct Worker {
     id: usize,
-    thread: thread::JoinHandle<()>,
+    thread: Option<thread::JoinHandle<()>>,
 }
 
 impl Worker {
-    fn new(id: usize, receiver: Arc<Mutex<mpsc::Receiver<Job>>>) -> Worker {
-        let thread = thread::spawn(move || loop {
-            // @Note: acquiring a lock might fail if the mutex is in
-            // a poisoned state, which can happen if some other thread
-            // panicked while holding the lock rather than releasing it.
+    fn new(id: usize, receiver: Arc<Mutex<mpsc::Receiver<Message>>>) -> Worker {
+        let thread = thread::spawn(move ||
+            loop {
+                // @Note: the call to `recv` blocks, so if there is no job yet,
+                // the current thread will wait until a job becomes available.
+                // The `Mutex<T>` ensures that only one `Worker` thread at a time
+                // is trying to request a job.
 
-            // @Note: the call to `recv` blocks, so if there is no job yet,
-            // the current thread will wait until a job becomes available.
-            // The `Mutex<T>` ensures that only one `Worker` thread at a time
-            // is trying to request a job.
+                // @Note: acquiring a lock might fail if the mutex is in
+                // a poisoned state, which can happen if some other thread
+                // panicked while holding the lock rather than releasing it.
 
-            let job = receiver.lock().unwrap().recv().unwrap();
+                let message = receiver.lock().unwrap().recv().unwrap();
 
-            println!("Worker {} got a job; executing.", id);
+                match message {
+                    Message::NewJob(job) => {
+                        println!("Worker {} got a job; executing.", id);
 
-            // @Note: since we acquired the lock without assigning to a variable,
-            // the temporary `MutexGuard` returned from the `lock` method is
-            // dropped as soon as the `let job` statement ends.
-            //
-            // This ensures that the lock is held during the call to `recv`,
-            // but it is released before the call to `job()`, allowing multiple
-            // requests to be serviced concurrently.
+                        // @Note: since we acquired the lock without assigning to a variable,
+                        // the temporary `MutexGuard` returned from the `lock` method is
+                        // dropped as soon as the `let job` statement ends.
+                        //
+                        // This ensures that the lock is held during the call to `recv`,
+                        // but it is released before the call to `job()`, allowing multiple
+                        // requests to be serviced concurrently.
 
-            job();
-        });
+                        job();
+                    }
+                    Message::Terminate => {
+                        println!("Worker {} was told to terminate.", id);
 
-        Worker { id, thread }
+                        break;
+                    }
+                }
+            }
+        );
+
+        Worker {
+            id,
+            thread: Some(thread),
+        }
     }
 }

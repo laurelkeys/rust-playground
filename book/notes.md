@@ -1288,9 +1288,3 @@
 * At the time of this writing, procedural macros need to be in their own crate. Eventually, this restriction might be lifted. The convention for structuring crates and macro crates is as follows: for a crate named `foo`, a custom derive procedural macro crate is called `foo_derive` [[ch19-06](https://doc.rust-lang.org/book/ch19-06-macros.html#how-to-write-a-custom-derive-macro)]
 * Attribute-like macros are similar to custom derive macros, but instead of generating code for the `derive` attribute, they allow you to create new attributes. They're also more flexible: `derive` only works for structs and enums; attributes can be applied to other items as well, such as functions [[ch19-06](https://doc.rust-lang.org/book/ch19-06-macros.html#attribute-like-macros)]
 * Function-like macros define macros that look like function calls. Similarly to `macro_rules!` macros, they're more flexible than functions; for example, they can take an unknown number of arguments. However, `macro_rules!` macros can be defined only using the match-like syntax shown above, while function-like macros take a `TokenStream` parameter and their definition manipulates that `TokenStream` using Rust code as the other two types of procedural macros do [[ch19-06](https://doc.rust-lang.org/book/ch19-06-macros.html#function-like-macros)]
-
-
-<!--
-    Next chapter to read:
-    https://doc.rust-lang.org/book/ch20-03-graceful-shutdown-and-cleanup.html
- -->
