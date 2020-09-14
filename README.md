@@ -2,7 +2,7 @@
 
 Trying out this Rust thing... let's see how it goes 🦀
 
-## `book/`
+## book[`/`](book/)
 Notes on [_the_ book](https://doc.rust-lang.org/book/) "The Rust Programming Language", together with code examples.
 
 ```bash
@@ -27,7 +27,18 @@ Notes on [_the_ book](https://doc.rust-lang.org/book/) "The Rust Programming Lan
 └── notes.md            # complete notes
 ```
 
-## `lrtdw/`
+## crust[`/`](crust/)
+Coding along [Jon Gjengset](https://github.com/jonhoo)'s "[Crust of Rust](https://www.youtube.com/playlist?list=PLqbS7AVVErFiWDOAVrPt7aYmnuuOLYvOa)" video series.
+
+```bash
+.
+└── strsplit/
+    ├── src/
+    │   └── lib.rs      # crust of rust: lifetime annotations
+    └── Cargo.toml
+```
+
+## lrtdw[`/`](lrtdw/)
 Following [Cliff L. Biffle](http://cliffle.com/about/)'s `unsafe`-first approach to "[Learn Rust the Dangerous Way](http://cliffle.com/p/dangerust/)" (LRtDW) series of articles.
 
 ```bash
@@ -43,7 +54,7 @@ Following [Cliff L. Biffle](http://cliffle.com/about/)'s `unsafe`-first approach
 └ make.py               # build script
 ```
 
-## `lrwetmll/`
+## lrwetmll[`/`](lrwetmll/)
 Following "[Learn Rust With Entirely Too Many Linked Lists](https://rust-unofficial.github.io/too-many-lists/)" chapters.
 
 ```bash
