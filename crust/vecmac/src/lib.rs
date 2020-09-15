@@ -14,6 +14,7 @@ macro_rules! arr {
             //
 
             let count = $count;
+
             let mut xs = Vec::with_capacity(count);
 
             let x = $x;
@@ -29,9 +30,13 @@ macro_rules! arr {
 
     ($( $x:expr ),*) => {
         {
+            const COUNT: usize = $crate::count![$( $x:expr ),*]; // check that `count!` is const
+
             #[allow(unused_mut)]
-            let mut xs = Vec::new();
+            let mut xs = Vec::with_capacity(COUNT);
+
             $( xs.push($x); )*
+
             xs
         }
     };
@@ -47,7 +52,21 @@ macro_rules! arr {
     //  |       ...
     //  |   }
     //
-    // However, that would allow for this syntax: `arr![,]`.
+    // However, that would allow for this undesired syntax: `arr![,]`.
+}
+
+#[doc(hidden)]
+#[macro_export]
+macro_rules! count {
+    // Reference: https://danielkeep.github.io/tlborm/book/blk-counting.html#slice-length
+
+    ($( $elem:expr ),*) => {
+        <[()]>::len(&[
+            $( $crate::count![$elem => ()] ),*
+        ])
+    };
+
+    ($_elem:expr => $subst:expr) => { $subst };
 }
 
 //
@@ -90,7 +109,15 @@ mod test {
             "lakdjwaidjiwalfjhawligfjawilfjawlifwjalwijwfalijawfiljfaew",
             "lakdjwaidjiwalfjhawligfjawilfjawlifwjalwijwfalijawfiljfaew",
             "lakdjwaidjiwalfjhawligfjawilfjawlifwjalwijwfalijawfiljfaew",
+            "lakdjwaidjiwalfjhawligfjawilfjawlifwjalwijwfalijawfiljfaew", // <-- valid syntax
+        ];
+
+        let _: Vec<&'static str> = arr![
             "lakdjwaidjiwalfjhawligfjawilfjawlifwjalwijwfalijawfiljfaew",
+            "lakdjwaidjiwalfjhawligfjawilfjawlifwjalwijwfalijawfiljfaew",
+            "lakdjwaidjiwalfjhawligfjawilfjawlifwjalwijwfalijawfiljfaew",
+            "lakdjwaidjiwalfjhawligfjawilfjawlifwjalwijwfalijawfiljfaew",
+            "lakdjwaidjiwalfjhawligfjawilfjawlifwjalwijwfalijawfiljfaew" // <-- also valid
         ];
     }
 
