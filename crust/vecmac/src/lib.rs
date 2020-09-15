@@ -4,26 +4,50 @@
 macro_rules! arr {
     // See https://doc.rust-lang.org/reference/macros-by-example.html#metavariables
 
-    () => { Vec::new() };
-
-    ($( $x: expr ),+ $( , )?) => {
+    ($x:expr; $count:expr) => {
         {
+            // @Optimization: calling `resize()` would allow us not to worry about
+            // copying the metavariables, so we could have simply done the following:
+            //  |
+            //  |   let mut xs = Vec::new();
+            //  |   xs.resize($count, $x);
+            //
+
+            let count = $count;
+            let mut xs = Vec::with_capacity(count);
+
+            let x = $x;
+            for _ in 0..count { xs.push(x.clone()); }
+            // @Note: this could be made slightly more efficient with:
+            //  |
+            //  |   xs.extend(::std::iter::repeat(x).take(count));
+            //
+
+            xs
+        }
+    };
+
+    ($( $x:expr ),*) => {
+        {
+            #[allow(unused_mut)]
             let mut xs = Vec::new();
             $( xs.push($x); )*
             xs
         }
     };
 
-    ($x: expr; $count: expr) => {
-        {
-            let mut xs = Vec::new();
-            let x = $x;
-            for _ in 0..$count {
-                xs.push(x.clone());
-            }
-            xs
-        }
-    };
+    // @Volatile: this has to be defined *after* the match it's
+    // calling (i.e. the one right above), otherwise we would get to
+    // an infinite recursion, as it would continuosly (re)match itself.
+    ($( $x:expr, )*) => { $crate::arr![$( $x ),*] };
+
+    // @Note: we could have grouped the two prior matches as:
+    //  |
+    //  |   ($( $x: expr ),* $( , )?) => {
+    //  |       ...
+    //  |   }
+    //
+    // However, that would allow for this syntax: `arr![,]`.
 }
 
 //
@@ -34,7 +58,7 @@ macro_rules! arr {
 mod test {
     use super::*;
 
-    // @Note: use `cargo expand --lib --tests` to see the result of macro expansions.
+    // @Note: run `cargo expand --lib --tests` to see the macro expansions.
 
     #[test]
     fn empty_vec() {
@@ -80,7 +104,7 @@ mod test {
     }
 
     #[test]
-    fn clone_2_nonliterals() {
+    fn clone_nonliteral_2() {
         let mut y = Some(42);
         let x: Vec<u32> = arr![y.take().unwrap(); 2];
         assert!(!x.is_empty());
