@@ -80,7 +80,7 @@ impl Delimiter for char {
 }
 
 pub fn until_char(s: &str, c: char) -> &str {
-    StrSplit::new(s, &*format!("{}", c))
+    StrSplit::new(s, c)
         .next()
         .expect("StrSplit always gives at least one result")
 }

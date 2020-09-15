@@ -33,9 +33,14 @@ Coding along [Jon Gjengset](https://github.com/jonhoo)'s "[Crust of Rust](https:
 
 ```bash
 .
-└── strsplit/
+├── strsplit/
+│   ├── src/
+│   │   └── lib.rs      # "Crust of Rust: Lifetime Annotations"
+│   └── Cargo.toml
+│
+└── vecmac/
     ├── src/
-    │   └── lib.rs      # "Crust of Rust: Lifetime Annotations"
+    │   └── lib.rs      # "Crust of Rust: Declarative Macros"
     └── Cargo.toml
 ```
 
