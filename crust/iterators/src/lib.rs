@@ -16,8 +16,8 @@ where
     outer: O,
     // @Note: `IntoIter` is the iterator type for `O::Item`
     // (you can see it as `Iterator<Item = O::Item>`).
-    inner: Option<<O::Item as IntoIterator>::IntoIter>, // `next()` iterator
-    inner_back: Option<<O::Item as IntoIterator>::IntoIter>, // `next_back()` iterator
+    inner: Option<<O::Item as IntoIterator>::IntoIter>, // front iterator, used by `next()`
+    inner_back: Option<<O::Item as IntoIterator>::IntoIter>, // back iterator, used by `next_back()`
 }
 
 impl<O> Flatten<O>
@@ -96,24 +96,23 @@ where
     }
 }
 
-// @Note: this is an "extension trait":
-pub trait IteratorExt: Iterator {
-    fn our_flatten(self) -> Flatten<Self>
+// Extension trait.
+pub trait IntoIteratorExt: IntoIterator + Sized {
+    fn our_flatten(self) -> Flatten<Self::IntoIter>
     where
-        Self: Sized,
         Self::Item: IntoIterator;
 }
 
-// @Note: this is a "blanket implementation":
-impl<T> IteratorExt for T
+// Blanket implementation.
+impl<T> IntoIteratorExt for T
 where
-    T: Iterator,
+    T: IntoIterator,
 {
-    fn our_flatten(self) -> Flatten<Self>
+    fn our_flatten(self) -> Flatten<Self::IntoIter>
     where
         Self::Item: IntoIterator,
     {
-        flatten(self)
+        flatten(self.into_iter())
     }
 }
 
@@ -205,12 +204,24 @@ mod tests {
 
     #[test]
     fn deep() {
-        assert_eq!(flatten(flatten(vec![vec![vec![0, 1]]])).count(), 2); // yields `0, 1`
+        assert_eq!(flatten(flatten(vec![vec![vec![0, 1]]])).count(), 2); // yields `0`, `1`
         assert_eq!(flatten(vec![vec![vec![0, 1]]]).count(), 1); // yields `vec![0, 1]`
+
+        let mut two_deep = flatten(flatten(vec![vec![vec![0, 1]]]));
+        assert_eq!(two_deep.next(), Some(0));
+        assert_eq!(two_deep.next(), Some(1));
+        assert_eq!(two_deep.next(), None);
+
+        let mut one_deep = flatten(vec![vec![vec![0, 1]]]);
+        assert_eq!(one_deep.next(), Some(vec![0, 1]));
+        assert_eq!(one_deep.next(), None);
     }
 
     #[test]
     fn ext() {
         assert_eq!(vec![vec![0, 1]].into_iter().our_flatten().count(), 2);
+        // @Note: if the extension trait was made for `Iterator` (as in the video),
+        // instead of for `IntoIterator`, omitting `into_iter()` wouldn't be possible:
+        assert_eq!(vec![vec![0, 1], vec![0, 1]].our_flatten().count(), 4);
     }
 }

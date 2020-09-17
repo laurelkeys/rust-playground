@@ -38,9 +38,14 @@ Coding along [Jon Gjengset](https://github.com/jonhoo)'s "[Crust of Rust](https:
 │   │   └── lib.rs      # "Crust of Rust: Lifetime Annotations"
 │   └── Cargo.toml
 │
-└── vecmac/
+├── vecmac/
+│   ├── src/
+│   │   └── lib.rs      # "Crust of Rust: Declarative Macros"
+│   └── Cargo.toml
+│
+└── iterators/
     ├── src/
-    │   └── lib.rs      # "Crust of Rust: Declarative Macros"
+    │   └── lib.rs      # "Crust of Rust: Iterators"
     └── Cargo.toml
 ```
 
