@@ -1,11 +1,11 @@
-// @Todo: continue from https://youtu.be/yozQ9C69pNs?t=2580
+// https://www.youtube.com/watch?v=yozQ9C69pNs
 
-pub fn flatten<I>(iter: I) -> Flatten<I>
+pub fn flatten<I>(iter: I) -> Flatten<I::IntoIter>
 where
-    I: Iterator,
+    I: IntoIterator,
     I::Item: IntoIterator,
 {
-    Flatten::new(iter)
+    Flatten::new(iter.into_iter())
 }
 
 pub struct Flatten<O>
@@ -14,9 +14,10 @@ where
     O::Item: IntoIterator,
 {
     outer: O,
-    // @Note: `IntoIter` is the iterator type of `O::Item`
+    // @Note: `IntoIter` is the iterator type for `O::Item`
     // (you can see it as `Iterator<Item = O::Item>`).
-    inner: Option<<O::Item as IntoIterator>::IntoIter>,
+    inner: Option<<O::Item as IntoIterator>::IntoIter>, // `next()` iterator
+    inner_back: Option<<O::Item as IntoIterator>::IntoIter>, // `next_back()` iterator
 }
 
 impl<O> Flatten<O>
@@ -28,6 +29,7 @@ where
         Flatten {
             outer: iter,
             inner: None,
+            inner_back: None,
         }
     }
 }
@@ -41,20 +43,77 @@ where
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
-            /* inner_iter: &mut IntoIterator::IntoIter<Iterator::Item<O>> */
-            // if let Some(inner_iter) = &mut self.inner {
-            // if let Some(ref mut inner_iter) = self.inner {
             if let Some(inner_iter) = self.inner.as_mut() {
+                // @Note: we could rewrite the if-statement above in two other ways:
+                //  |
+                //  |   if let Some(inner_iter) = &mut self.inner {
+                //
+                // or:
+                //  |
+                //  |   if let Some(ref mut inner_iter) = self.inner {
+                //
+                // In all three cases, the type of `inner_iter` is going to be
+                // `&mut IntoIterator::IntoIter<Iterator::Item<O>>`.
+
                 if let Some(item) = inner_iter.next() {
                     return Some(item);
                 }
+
                 self.inner = None
             }
 
-            // @Note: the `?` below guarantees we will eventually break out of the loop.
-            let next_inner_iter = self.outer.next()?.into_iter();
-            self.inner = Some(next_inner_iter);
+            if let Some(next_inner_iter) = self.outer.next() {
+                self.inner = Some(next_inner_iter.into_iter());
+            } else {
+                return self.inner_back.as_mut()?.next();
+            }
         }
+    }
+}
+
+impl<O> DoubleEndedIterator for Flatten<O>
+where
+    O: DoubleEndedIterator,
+    O::Item: IntoIterator,
+    <O::Item as IntoIterator>::IntoIter: DoubleEndedIterator,
+{
+    fn next_back(&mut self) -> Option<Self::Item> {
+        loop {
+            if let Some(inner_back_iter) = self.inner_back.as_mut() {
+                if let Some(item) = inner_back_iter.next_back() {
+                    return Some(item);
+                }
+
+                self.inner_back = None
+            }
+
+            if let Some(next_inner_back_iter) = self.outer.next_back() {
+                self.inner_back = Some(next_inner_back_iter.into_iter());
+            } else {
+                return self.inner.as_mut()?.next_back();
+            }
+        }
+    }
+}
+
+// @Note: this is an "extension trait":
+pub trait IteratorExt: Iterator {
+    fn our_flatten(self) -> Flatten<Self>
+    where
+        Self: Sized,
+        Self::Item: IntoIterator;
+}
+
+// @Note: this is a "blanket implementation":
+impl<T> IteratorExt for T
+where
+    T: Iterator,
+{
+    fn our_flatten(self) -> Flatten<Self>
+    where
+        Self::Item: IntoIterator,
+    {
+        flatten(self)
     }
 }
 
@@ -78,10 +137,7 @@ mod tests {
 
     #[test]
     fn empty_wide() {
-        assert_eq!(
-            flatten(vec![Vec::<()>::new(), vec![], vec![]].into_iter()).count(),
-            0
-        );
+        assert_eq!(flatten(vec![Vec::<()>::new(), vec![], vec![]]).count(), 0);
     }
 
     #[test]
@@ -96,6 +152,65 @@ mod tests {
 
     #[test]
     fn two_wide() {
-        assert_eq!(flatten(vec![vec!["a"], vec!["b"]].into_iter()).count(), 2);
+        assert_eq!(flatten(vec![vec!["a"], vec!["b"]]).count(), 2);
+    }
+
+    #[test]
+    fn reverse() {
+        assert_eq!(
+            flatten(std::iter::once(vec!["a", "b"]))
+                .rev()
+                .collect::<Vec<_>>(),
+            vec!["b", "a"]
+        );
+    }
+
+    #[test]
+    fn reverse_wide() {
+        assert_eq!(
+            flatten(vec![vec!["a"], vec!["b"]])
+                .rev()
+                .collect::<Vec<_>>(),
+            vec!["b", "a"]
+        );
+    }
+
+    #[test]
+    fn both_ends() {
+        let mut iter = flatten(vec![vec!["a1", "a2", "a3"], vec!["b1", "b2", "b3"]]);
+        assert_eq!(iter.next(), Some("a1"));
+        assert_eq!(iter.next_back(), Some("b3"));
+        assert_eq!(iter.next(), Some("a2"));
+        assert_eq!(iter.next_back(), Some("b2"));
+        assert_eq!(iter.next(), Some("a3"));
+        assert_eq!(iter.next_back(), Some("b1"));
+        assert_eq!(iter.next(), None);
+        assert_eq!(iter.next_back(), None);
+    }
+
+    #[test]
+    fn inf() {
+        let mut iter = flatten((0..).map(|i| 0..i));
+        // 0 => 0..0 => empty
+        // 1 => 0..1 => [0]
+        // 2 => 0..2 => [0, 1]
+        // 3 => 0..3 => [0, 1, 2]
+        assert_eq!(iter.next(), Some(0));
+        assert_eq!(iter.next(), Some(0));
+        assert_eq!(iter.next(), Some(1));
+        assert_eq!(iter.next(), Some(0));
+        assert_eq!(iter.next(), Some(1));
+        assert_eq!(iter.next(), Some(2));
+    }
+
+    #[test]
+    fn deep() {
+        assert_eq!(flatten(flatten(vec![vec![vec![0, 1]]])).count(), 2); // yields `0, 1`
+        assert_eq!(flatten(vec![vec![vec![0, 1]]]).count(), 1); // yields `vec![0, 1]`
+    }
+
+    #[test]
+    fn ext() {
+        assert_eq!(vec![vec![0, 1]].into_iter().our_flatten().count(), 2);
     }
 }
