@@ -34,19 +34,16 @@ Coding along [Jon Gjengset](https://github.com/jonhoo)'s "[Crust of Rust](https:
 ```bash
 .
 ├── strsplit/
-│   ├── src/
-│   │   └── lib.rs      # "Crust of Rust: Lifetime Annotations"
-│   └── Cargo.toml
+│   └── src/lib.rs      # "Crust of Rust: Lifetime Annotations"
 │
 ├── vecmac/
-│   ├── src/
-│   │   └── lib.rs      # "Crust of Rust: Declarative Macros"
-│   └── Cargo.toml
+│   └── src/lib.rs      # "Crust of Rust: Declarative Macros"
 │
-└── iterators/
-    ├── src/
-    │   └── lib.rs      # "Crust of Rust: Iterators"
-    └── Cargo.toml
+├── iterators/
+│   └── src/lib.rs      # "Crust of Rust: Iterators"
+│
+└── pointers/
+    └── src/lib.rs      # "Crust of Rust: Smart Pointers and Interior Mutability"
 ```
 
 ## lrtdw[`/`](lrtdw/)
