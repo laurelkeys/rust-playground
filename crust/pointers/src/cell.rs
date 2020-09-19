@@ -33,12 +33,3 @@ impl<T> Cell<T> {
         unsafe { *self.value.get() }
     }
 }
-
-//
-// Test functions.
-//
-
-#[cfg(test)]
-mod test {
-    use super::Cell;
-}

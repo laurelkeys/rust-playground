@@ -43,7 +43,11 @@ Coding along [Jon Gjengset](https://github.com/jonhoo)'s "[Crust of Rust](https:
 │   └── src/lib.rs      # "Crust of Rust: Iterators"
 │
 └── pointers/
-    └── src/lib.rs      # "Crust of Rust: Smart Pointers and Interior Mutability"
+    └── src/            # "Crust of Rust: Smart Pointers and Interior Mutability"
+        ├── lib.rs
+        ├── cell.rs     # a mutable memory location
+        ├── refcell.rs  # a mutable memory location with dynamically checked borrow rules
+        └── rc.rs       # a single-threaded reference-counting pointer
 ```
 
 ## lrtdw[`/`](lrtdw/)

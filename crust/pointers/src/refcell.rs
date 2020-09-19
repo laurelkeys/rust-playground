@@ -122,12 +122,3 @@ impl<T> Drop for RefMut<'_, T> {
         }
     }
 }
-
-//
-// Test functions.
-//
-
-#[cfg(test)]
-mod test {
-    use super::RefCell;
-}
