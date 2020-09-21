@@ -1,3 +1,34 @@
+//
+// Flavors:
+//
+//  * Synchronous channels
+//      Channel where `send()` can block. Usually has *limited capacity*.
+//      Also known as "bounded channels".
+//      See https://youtu.be/b4mS5UPHh20?t=4966
+//        - Mutex + Condvar + VecDeque
+//        - Atomic VecDeque (atomic queue) + thread::park + thread::Thread::notify
+//
+//  * Asynchronous channels
+//      Channel where `send()` cannot block. Usually *unbounded*.
+//      Also known as "unbounded channels".
+//      See https://youtu.be/b4mS5UPHh20?t=5148
+//        - Mutex + Condvar + VecDeque
+//        - Mutex + Condvar + LinkedList
+//        - Atomic linked list, linked list of T
+//        - Atomic block linked list, linked list of atomic VecDeque<T>
+//
+//  * Rendezvous channels
+//      Synchronous channel with capacity = 0 (i.e. you can only send if there is
+//      currently a blocking receiver, since you can't store anything in the channel
+//      itself, data has to be handed to a thread that is currently waiting).
+//      Used for (two-way) thread synchronization.
+//      See https://youtu.be/b4mS5UPHh20?t=5344
+//
+//  * Oneshot channels
+//      Any capacity channels that, in practice, you can only call `send()` on once.
+//      See https://youtu.be/b4mS5UPHh20?t=5383
+//
+
 use std::collections::VecDeque;
 use std::sync::{Arc, Condvar, Mutex};
 
@@ -19,7 +50,7 @@ pub fn channel<T>() -> (Sender<T>, Receiver<T>) {
 
     (
         Sender { shared: Arc::clone(&shared) },
-        Receiver { shared: Arc::clone(&shared) },
+        Receiver { shared: Arc::clone(&shared), buffer: VecDeque::default() },
     )
 }
 
@@ -79,16 +110,31 @@ impl<T> Sender<T> {
 
 pub struct Receiver<T> {
     shared: Arc<Shared<T>>,
+    buffer: VecDeque<T>, // "local buffer" to spare calls to `recv()`
 }
 
 impl<T> Receiver<T> {
     pub fn recv(&mut self) -> Option<T> {
+        // Return values from the local buffer, if there are any
+        // (thus, avoiding a mutex lock).
+        if let Some(t) = self.buffer.pop_front() {
+            return Some(t);
+        }
+
         let mut inner = self.shared.inner.lock().unwrap();
         // @Note: this loop is not a spinlock because, using `Condvar`, we can block a
         // thread such that it consumes no CPU time while waiting for an event to occur.
         loop {
             match inner.queue.pop_front() {
-                Some(t) => return Some(t),
+                Some(t) => {
+                    // Store remaining messages into the receiver's local buffer.
+                    if !inner.queue.is_empty() {
+                        // @Note: because of this, the lock will be taken fewer times,
+                        // so this optimization reduces the amount of contention.
+                        std::mem::swap(&mut self.buffer, &mut inner.queue)
+                    }
+                    return Some(t);
+                }
                 None => {
                     if inner.senders == 0 {
                         return None;
@@ -144,5 +190,16 @@ mod tests {
         // See https://youtu.be/b4mS5UPHh20?t=3282
         drop(rx);
         tx.send(42);
+    }
+
+    #[test]
+    fn iterator() {
+        let (mut tx, rx) = channel();
+
+        tx.send(42);
+        tx.send(43);
+        tx.send(44);
+
+        assert_eq!(rx.take(3).collect::<Vec<i32>>(), vec![42, 43, 44]);
     }
 }
