@@ -1,3 +1,6 @@
+// @Todo: continue from https://rust-cli.github.io/book/tutorial/testing.html#generating-test-files
+
+use anyhow::{Context, Result};
 use structopt::StructOpt;
 
 /// Search for a pattern in a file and display the lines that contain it.
@@ -10,17 +13,15 @@ struct Cli {
     path: std::path::PathBuf,
 }
 
-fn main() {
+fn main() -> Result<()> {
     let args = Cli::from_args();
 
     // @Todo @Robustness: this will read the whole file into memory,
     // however large it may be. It could be optimized using `BufReader`.
-    let content = std::fs::read_to_string(&args.path).expect("could not read file");
+    let content = std::fs::read_to_string(&args.path)
+        .with_context(|| format!("could not read file `{}`", args.path.display()))?;
 
-    for line in content.lines() {
-        if line.contains(&args.pattern) {
-            println!("{}", line);
-        }
-    }
+    grrs::find_matches(&content, &args.pattern, &mut std::io::stdout())?;
 
+    Ok(())
 }
