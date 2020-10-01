@@ -1,5 +1,3 @@
-// @Todo: continue from https://rust-cli.github.io/book/tutorial/testing.html#generating-test-files
-
 use anyhow::{Context, Result};
 use structopt::StructOpt;
 

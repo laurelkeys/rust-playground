@@ -3,7 +3,7 @@
 Trying out this Rust thing... let's see how it goes 🦀
 
 ## book[`/`](book/)
-Notes on [_the_ book](https://doc.rust-lang.org/book/) "The Rust Programming Language", together with code examples.
+Notes on [_the book_](https://doc.rust-lang.org/book/) "The Rust Programming Language", together with code examples.
 
 ```bash
 .
@@ -26,6 +26,20 @@ Notes on [_the_ book](https://doc.rust-lang.org/book/) "The Rust Programming Lan
 ├── ch20-hello/...
 │
 └── notes.md            # complete book notes
+```
+
+## clair[`/`](clair/)
+Really simple command line app example, from the Rust CLI [working group](https://github.com/rust-cli/meta)'s book ["Command Line Applications in Rust"](https://doc.rust-lang.org/book/) (CLAiR).
+
+```bash
+.
+└── grrs/               # super small grep clone ("grass")
+    ├── src/
+    │   ├── lib.rs      # find patterns in string content
+    │   └── main.rs     # command line interface
+    ├── tests/
+    │   └── cli.rs      # integration tests
+    └── Cargo.toml
 ```
 
 ## crust[`/`](crust/)

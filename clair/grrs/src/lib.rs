@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 
+/// Searches for `pattern` in `content` and writes the lines that match it to `writer`.
 pub fn find_matches(content: &str, pattern: &str, mut writer: impl std::io::Write) -> Result<()> {
     for (index, line) in content.lines().enumerate() {
         if line.contains(pattern) {

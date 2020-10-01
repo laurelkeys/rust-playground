@@ -30,3 +30,20 @@ fn find_content_in_file() -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
+
+#[test]
+fn empty_string_as_pattern() -> Result<(), Box<dyn std::error::Error>> {
+    let mut file = NamedTempFile::new()?;
+    writeln!(
+        file,
+        "This test file\nWill be entirely\nMatched by\nThe empty string"
+    )?;
+
+    let mut cmd = Command::cargo_bin("grrs")?;
+    cmd.arg("").arg(file.path());
+    cmd.assert().success().stdout(predicate::str::contains(
+        "This test file\nWill be entirely\nMatched by\nThe empty string",
+    ));
+
+    Ok(())
+}
