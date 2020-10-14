@@ -1,16 +1,14 @@
-// @Todo: continue from https://rustwasm.github.io/docs/book/game-of-life/implementing.html#rendering-with-javascript
+// @Todo: continue from https://rustwasm.github.io/docs/book/game-of-life/implementing.html#exercises
 
 mod utils;
 
 use std::fmt;
 use wasm_bindgen::prelude::*;
 
-/*
 // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global allocator.
 #[cfg(feature = "wee_alloc")]
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
-*/
 
 // @Note: by using `repr(u8)` we ensure that each cell is represented as a single byte.
 #[wasm_bindgen]
@@ -122,6 +120,8 @@ impl Universe {
     pub fn width(&self) -> u32 { self.width }
 
     pub fn height(&self) -> u32 { self.height }
+
+    pub fn cells(&self) -> *const Cell { self.cells.as_ptr() }
 }
 
 impl Default for Universe {
