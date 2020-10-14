@@ -8,3 +8,7 @@ const renderLoop = () => {
     universe.tick();
     requestAnimationFrame(renderLoop);
 }
+
+// Start the rendering process, drawing the current universe to `<pre>`
+// and then calling `Universe::tick` at each iteration.
+requestAnimationFrame(renderLoop);
