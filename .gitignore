@@ -14,3 +14,9 @@ Cargo.lock
 
 # Miscellaneous
 !book/ch14-add/Cargo.lock
+
+wasm/game-of-life/pkg
+wasm/game-of-life/tests
+wasm/game-of-life/www/.*
+wasm/game-of-life/www/README.md
+wasm/game-of-life/**/package-lock.json
