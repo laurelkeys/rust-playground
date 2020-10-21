@@ -18,16 +18,40 @@ canvas.height = (CELL_SIZE + 1) * height + 1;
 
 const ctx = canvas.getContext("2d");
 
+// Keep track of the identifier returned by `requestAnimationFrame`.
+let requestAnimationId = null;
+
+// Check whether or not the game is paused.
+const isPaused = () => {
+    return requestAnimationId === null;
+}
+
 // Call `Universe::tick` and then draw the current universe to `<canvas>`
 // at each iteration.
 const renderLoop = () => {
+    // debugger; // invoke debugging functionality if it's available
     universe.tick();
 
     drawGrid();
     drawCells();
 
-    requestAnimationFrame(renderLoop);
+    requestAnimationId = requestAnimationFrame(renderLoop);
 }
+
+const playPauseButton = document.getElementById("play-pause");
+
+// Resume the `renderLoop` animation.
+const play = () => {
+    playPauseButton.textContent = "⏸";
+    renderLoop();
+};
+
+// Cancel the next animation frame.
+const pause = () => {
+    playPauseButton.textContent = "▶";
+    cancelAnimationFrame(requestAnimationId);
+    requestAnimationId = null;
+};
 
 // Draw the universe grid as a series of vertical and horizontal lines.
 const drawGrid = () => {
@@ -83,8 +107,36 @@ const drawCells = () => {
     ctx.stroke();
 }
 
-// Draw the initial state of the universe (i.e. the first "tick")
-// and start the rendering process.
-drawGrid();
-drawCells();
-requestAnimationFrame(renderLoop);
+// Add event listeners for `<button>` and `<canvas>`.
+
+playPauseButton.addEventListener("click", _ => {
+    if (isPaused()) {
+        play();
+    } else {
+        pause();
+    }
+});
+
+canvas.addEventListener("click", event => {
+    // Convert page-relative coordinates into canvas-relative coordinates.
+    const boundingRect = canvas.getBoundingClientRect();
+
+    const scaleX = canvas.width / boundingRect.width;
+    const scaleY = canvas.height / boundingRect.height;
+
+    const canvasLeft = (event.clientX - boundingRect.left) * scaleX;
+    const canvasTop = (event.clientY - boundingRect.top) * scaleY;
+
+    // Convert canvas-relative coordinates into row and column
+    const row = Math.min(Math.floor(canvasTop / (CELL_SIZE + 1)), height - 1);
+    const col = Math.min(Math.floor(canvasLeft / (CELL_SIZE + 1)), width - 1);
+
+    // Toggle the selected cell and redraw.
+    universe.toggleCell(row, col);
+
+    drawGrid();
+    drawCells();
+});
+
+// Start the Game of Life!
+play();

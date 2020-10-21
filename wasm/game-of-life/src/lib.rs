@@ -19,6 +19,15 @@ pub enum Cell {
     Alive = 1,
 }
 
+impl Cell {
+    fn toggle(&mut self) {
+        *self = match self {
+            Cell::Dead => Cell::Alive,
+            Cell::Alive => Cell::Dead,
+        }
+    }
+}
+
 // @Todo: represent each cell as a single bit.
 // See https://rustwasm.github.io/docs/book/game-of-life/implementing.html#exercises
 #[wasm_bindgen]
@@ -62,6 +71,13 @@ impl Universe {
         (row * self.width + column) as usize
     }
 
+    /// Toggle the state of a cell, turning if alive if it was dead, and vice-versa.
+    #[wasm_bindgen(js_name = toggleCell)]
+    pub fn toggle_cell(&mut self, row: u32, column: u32) {
+        let idx = self.get_index(row, column);
+        self.cells[idx].toggle();
+    }
+
     /// Compute one iteration of the "Game of Life".
     pub fn tick(&mut self) {
         let mut next = self.cells.clone();
@@ -71,11 +87,6 @@ impl Universe {
                 let idx = self.get_index(row, col);
                 let cell = self.cells[idx];
                 let live_neighbors = self.live_neighbor_count(row, col);
-
-                log!(
-                    "cell[{}, {}] is initially {:?} and has {} live neighbors",
-                    row, col, cell, live_neighbors
-                );
 
                 let next_cell = match (cell, live_neighbors) {
                     // Rule 1: Any live cell with fewer than two live neighbors
@@ -98,7 +109,6 @@ impl Universe {
                     (otherwise, _) => otherwise,
                 };
 
-                log!("    it becomes {:?}", next_cell);
                 next[idx] = next_cell;
             }
         }
