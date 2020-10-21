@@ -16,13 +16,23 @@
             align-items: center;
             justify-content: center;
         }
+
+        #fps {
+            white-space: pre;
+            font-family: monospace;
+        }
     </style>
 </head>
 
 <body>
+    <div id="fps"></div>
     <canvas id="game-of-life-canvas"></canvas>
     <br>
-    <button id="play-pause"></button>
+    <p>
+        <button id="exterminate">🔄</button>
+        <button id="play-pause">▶</button>
+        <button id="randomize">🔀</button>
+    </p>
     <script src="./bootstrap.js"></script>
 </body>
 

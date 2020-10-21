@@ -1,4 +1,4 @@
-// @Todo: continue from https://rustwasm.github.io/docs/book/game-of-life/debugging.html
+// @Todo: continue from https://rustwasm.github.io/docs/book/game-of-life/time-profiling.html#creating-a-frames-per-second-timer-with-the-windowperformancenow-function
 
 mod utils;
 
@@ -80,6 +80,8 @@ impl Universe {
 
     /// Compute one iteration of the "Game of Life".
     pub fn tick(&mut self) {
+        let _timer = utils::Timer::new("Universe::tick");
+
         let mut next = self.cells.clone();
 
         for row in 0..self.height {
@@ -143,6 +145,7 @@ impl Universe {
     /// Returns a new 64x64 universe.
     pub fn new() -> Self {
         utils::set_panic_hook();
+        let _timer = utils::Timer::new("Universe::new");
 
         let width = 64;
         let height = 64;
@@ -158,6 +161,28 @@ impl Universe {
             .collect();
 
         Self { width, height, cells }
+    }
+
+    /// Resets the universe to a random initial state.
+    pub fn randomize(&mut self) {
+        let _timer = utils::Timer::new("Universe::randomize");
+
+        for cell in &mut self.cells {
+            *cell = if js_sys::Math::random() < 0.5 {
+                Cell::Alive
+            } else {
+                Cell::Dead
+            };
+        }
+    }
+
+    /// Resets the universe to all dead cells.
+    pub fn exterminate(&mut self) {
+        let _timer = utils::Timer::new("Universe::exterminate");
+
+        for cell in &mut self.cells {
+            *cell = Cell::Dead;
+        }
     }
 }
 

@@ -30,10 +30,9 @@ const isPaused = () => {
 // at each iteration.
 const renderLoop = () => {
     // debugger; // invoke debugging functionality if it's available
-    universe.tick();
 
-    drawGrid();
-    drawCells();
+    universe.tick();
+    drawUniverse();
 
     requestAnimationId = requestAnimationFrame(renderLoop);
 }
@@ -107,15 +106,12 @@ const drawCells = () => {
     ctx.stroke();
 }
 
-// Add event listeners for `<button>` and `<canvas>`.
+const drawUniverse = () => {
+    drawGrid();
+    drawCells();
+}
 
-playPauseButton.addEventListener("click", _ => {
-    if (isPaused()) {
-        play();
-    } else {
-        pause();
-    }
-});
+// Add event listeners for `<canvas>` and `<button>`s.
 
 canvas.addEventListener("click", event => {
     // Convert page-relative coordinates into canvas-relative coordinates.
@@ -133,9 +129,25 @@ canvas.addEventListener("click", event => {
 
     // Toggle the selected cell and redraw.
     universe.toggleCell(row, col);
+    drawUniverse();
+});
 
-    drawGrid();
-    drawCells();
+playPauseButton.addEventListener("click", _ => {
+    if (isPaused()) {
+        play();
+    } else {
+        pause();
+    }
+});
+
+document.getElementById("randomize").addEventListener("click", _ => {
+    universe.randomize();
+    drawUniverse();
+});
+
+document.getElementById("exterminate").addEventListener("click", _ => {
+    universe.exterminate();
+    drawUniverse();
 });
 
 // Start the Game of Life!
