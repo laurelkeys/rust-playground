@@ -65,8 +65,7 @@ const drawCells = () => {
 
     for (let row = 0; row < height; ++row) {
         for (let col = 0; col < width; ++col) {
-            // @Todo: export `get_index` from lib.rs.
-            const idx = row * width + col;
+            const idx = universe.getIndex(row, col);
 
             ctx.fillStyle = cells[idx] === Cell.Dead
                 ? DEAD_COLOR
@@ -88,5 +87,4 @@ const drawCells = () => {
 // and start the rendering process.
 drawGrid();
 drawCells();
-
 requestAnimationFrame(renderLoop);

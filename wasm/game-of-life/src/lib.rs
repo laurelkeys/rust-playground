@@ -1,4 +1,4 @@
-// @Todo: continue from https://rustwasm.github.io/docs/book/game-of-life/implementing.html#exercises
+// @Todo: continue from https://rustwasm.github.io/docs/book/game-of-life/debugging.html
 
 mod utils;
 
@@ -19,6 +19,8 @@ pub enum Cell {
     Alive = 1,
 }
 
+// @Todo: represent each cell as a single bit.
+// See https://rustwasm.github.io/docs/book/game-of-life/implementing.html#exercises
 #[wasm_bindgen]
 pub struct Universe {
     width: u32,
@@ -27,18 +29,11 @@ pub struct Universe {
 }
 
 impl Universe {
-    /// Returns the index corresponding to the cell at position `(row, column)`
-    /// on the linear array representation of the Universe, which is stored on
-    /// WebAssembly's linear memory (with a byte for each cell).
-    fn get_index(&self, row: u32, column: u32) -> usize {
-        (row * self.width + column) as usize
-    }
-
     /// Count the number of alive neighbors of the cell at position `(row, column)`.
     fn live_neighbor_count(&self, row: u32, column: u32) -> u8 {
         let mut count = 0;
         // @Note: we use the modulo operator `%` since neighbors
-        // wrap around the Universe edges. Because of it, adding
+        // wrap around the universe edges. Because of it, adding
         // `self.height - 1` or `self.width - 1` has the same effect
         // as if we were to apply a delta of `-1` (but isn't prone to
         // unsigned integer underflow).
@@ -59,6 +54,14 @@ impl Universe {
 /// Public methods, exported to JavaScript.
 #[wasm_bindgen]
 impl Universe {
+    /// Returns the index corresponding to the cell at position `(row, column)`
+    /// on the flat array representation of the universe, which is stored on
+    /// WebAssembly's linear memory (with a byte for each cell).
+    #[wasm_bindgen(js_name = getIndex)]
+    pub fn get_index(&self, row: u32, column: u32) -> usize {
+        (row * self.width + column) as usize
+    }
+
     /// Compute one iteration of the "Game of Life".
     pub fn tick(&mut self) {
         let mut next = self.cells.clone();
@@ -69,23 +72,33 @@ impl Universe {
                 let cell = self.cells[idx];
                 let live_neighbors = self.live_neighbor_count(row, col);
 
+                log!(
+                    "cell[{}, {}] is initially {:?} and has {} live neighbors",
+                    row, col, cell, live_neighbors
+                );
+
                 let next_cell = match (cell, live_neighbors) {
                     // Rule 1: Any live cell with fewer than two live neighbors
                     // dies, as if caused by underpopulation.
                     (Cell::Alive, n) if n < 2 => Cell::Dead,
+
                     // Rule 2: Any live cell with two or three live neighbors
                     // lives on to the next generation.
                     (Cell::Alive, 2) | (Cell::Alive, 3) => Cell::Alive,
+
                     // Rule 3: Any live cell with more than three live
                     // neighbors dies, as if by overpopulation.
                     (Cell::Alive, n) if n > 3 => Cell::Dead,
+
                     // Rule 4: Any dead cell with exactly three live neighbors
                     // becomes a live cell, as if by reproduction.
                     (Cell::Dead, 3) => Cell::Alive,
+
                     // All other cells remain in the same state.
                     (otherwise, _) => otherwise,
                 };
 
+                log!("    it becomes {:?}", next_cell);
                 next[idx] = next_cell;
             }
         }
@@ -93,14 +106,34 @@ impl Universe {
         self.cells = next;
     }
 
-    /// Returns a string representation of the current state of the Universe,
+    /// Returns a string representation of the current state of the universe,
     /// composed of '◻'s and '◼'s UTF-8 characters.
     pub fn render(&self) -> String {
         self.to_string()
     }
 
-    /// Returns a new 64x64 Universe.
+    /// Set the width of the universe. Resets all cells to the dead state.
+    pub fn set_width(&mut self, width: u32) {
+        self.width = width;
+        self.cells = (0..(width * self.height)).map(|_i| Cell::Dead).collect();
+    }
+
+    /// Set the height of the universe. Resets all cells to the dead state.
+    pub fn set_height(&mut self, height: u32) {
+        self.height = height;
+        self.cells = (0..(self.width * height)).map(|_i| Cell::Dead).collect();
+    }
+
+    pub fn width(&self) -> u32 { self.width }
+
+    pub fn height(&self) -> u32 { self.height }
+
+    pub fn cells(&self) -> *const Cell { self.cells.as_ptr() }
+
+    /// Returns a new 64x64 universe.
     pub fn new() -> Self {
+        utils::set_panic_hook();
+
         let width = 64;
         let height = 64;
 
@@ -114,19 +147,29 @@ impl Universe {
             })
             .collect();
 
-        Universe { width, height, cells }
+        Self { width, height, cells }
+    }
+}
+
+impl Universe {
+    /// Get the dead and alive values of the entire universe.
+    pub fn get_cells(&self) -> &[Cell] {
+        &self.cells
     }
 
-    pub fn width(&self) -> u32 { self.width }
-
-    pub fn height(&self) -> u32 { self.height }
-
-    pub fn cells(&self) -> *const Cell { self.cells.as_ptr() }
+    /// Set cells to be alive in a universe by passing the row and column
+    /// of each cell as an array.
+    pub fn set_cells(&mut self, cells: &[(u32, u32)]) {
+        for (row, col) in cells.iter().copied() {
+            let idx = self.get_index(row, col);
+            self.cells[idx] = Cell::Alive;
+        }
+    }
 }
 
 impl Default for Universe {
     fn default() -> Self {
-        Universe::new()
+        Self::new()
     }
 }
 
