@@ -20,24 +20,14 @@ export const fps = new class {
         }
 
         // Find the max, min, and mean of our 100 latest timings.
-        // let min = Infinity;
-        // let max = -Infinity;
-        // let sum = 0;
-        // for (let i = 0; i < this.frames.length; ++i) {
-        //     sum += this.frames[i];
-        //     min = Math.min(this.frames[i], min);
-        //     max = Math.max(this.frames[i], max);
-        // }
-        let { min, max, sum } =
-            this.frames.reduce(
-                ({ min, max, sum }, fps) => ({
-                    min: Math.min(fps, min),
-                    max: Math.max(fps, max),
-                    sum: sum + fps,
-                }),
-                { min: Infinity, max: -Infinity, sum: 0 }
-            );
-
+        let min = Infinity;
+        let max = -Infinity;
+        let sum = 0;
+        for (let i = 0; i < this.frames.length; ++i) {
+            sum += this.frames[i];
+            min = Math.min(this.frames[i], min);
+            max = Math.max(this.frames[i], max);
+        }
         let mean = sum / this.frames.length;
 
         // Render the statistics.

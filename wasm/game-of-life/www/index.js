@@ -64,13 +64,13 @@ const drawGrid = () => {
 
     for (let x = 0; x <= width; ++x) {
         const curr_x = x * (CELL_SIZE + 1) + 1;
-        ctx.moveTo(curr_x,   0  );
+        ctx.moveTo(curr_x, 0);
         ctx.lineTo(curr_x, max_y);
     }
 
     for (let y = 0; y <= height; ++y) {
         const curr_y = y * (CELL_SIZE + 1) + 1;
-        ctx.moveTo(  0  , curr_y);
+        ctx.moveTo(0, curr_y);
         ctx.lineTo(max_x, curr_y);
     }
 }
@@ -88,22 +88,29 @@ const drawCells = () => {
 
     ctx.beginPath();
 
-    for (let row = 0; row < height; ++row) {
-        for (let col = 0; col < width; ++col) {
-            const idx = universe.getIndex(row, col);
-
-            ctx.fillStyle = cells[idx] === Cell.Dead
-                ? DEAD_COLOR
-                : ALIVE_COLOR;
-
-            ctx.fillRect(
-                col * (CELL_SIZE + 1) + 1,
-                row * (CELL_SIZE + 1) + 1,
-                CELL_SIZE,
-                CELL_SIZE
-            );
+    const fillCells = (cellState) => {
+        for (let row = 0; row < height; ++row) {
+            for (let col = 0; col < width; ++col) {
+                const idx = universe.getIndex(row, col);
+                if (cells[idx] == cellState) {
+                    ctx.fillRect(
+                        col * (CELL_SIZE + 1) + 1,
+                        row * (CELL_SIZE + 1) + 1,
+                        CELL_SIZE,
+                        CELL_SIZE
+                    );
+                }
+            }
         }
     }
+
+    // Alive cells.
+    ctx.fillStyle = ALIVE_COLOR;
+    fillCells(Cell.Alive);
+
+    // Dead cells.
+    ctx.fillStyle = DEAD_COLOR;
+    fillCells(Cell.Dead);
 
     ctx.stroke();
 }

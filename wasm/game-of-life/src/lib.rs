@@ -1,4 +1,6 @@
-// @Todo: continue from https://rustwasm.github.io/docs/book/game-of-life/time-profiling.html#creating-a-frames-per-second-timer-with-the-windowperformancenow-function
+// @Note: for shrinking the .wasm size, see https://rustwasm.github.io/docs/book/game-of-life/code-size.html
+// For more @Speedup ideas, see https://rustwasm.github.io/docs/book/game-of-life/time-profiling.html#exercises
+// For interesting crates related to Rust + Wasm, see https://rustwasm.github.io/docs/book/reference/crates.html
 
 mod utils;
 
@@ -28,7 +30,7 @@ impl Cell {
     }
 }
 
-// @Todo: represent each cell as a single bit.
+// @Speedup: represent each cell as a single bit.
 // See https://rustwasm.github.io/docs/book/game-of-life/implementing.html#exercises
 #[wasm_bindgen]
 pub struct Universe {
@@ -46,6 +48,7 @@ impl Universe {
         // `self.height - 1` or `self.width - 1` has the same effect
         // as if we were to apply a delta of `-1` (but isn't prone to
         // unsigned integer underflow).
+        // @Speedup: unroll this loop.
         for delta_row in [self.height - 1, 0, 1].iter().cloned() {
             for delta_col in [self.width - 1, 0, 1].iter().cloned() {
                 if delta_row == 0 && delta_col == 0 { continue; }
