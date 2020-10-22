@@ -1,5 +1,6 @@
 import { Universe, Cell } from "wasm-game-of-life";
 import { memory } from "wasm-game-of-life/game_of_life_bg";
+import { fps } from "./fps.js";
 
 const CELL_SIZE = 5; // px
 const GRID_COLOR = "#cccccc";
@@ -30,6 +31,7 @@ const isPaused = () => {
 // at each iteration.
 const renderLoop = () => {
     // debugger; // invoke debugging functionality if it's available
+    fps.render();
 
     universe.tick();
     drawUniverse();
@@ -68,7 +70,7 @@ const drawGrid = () => {
 
     for (let y = 0; y <= height; ++y) {
         const curr_y = y * (CELL_SIZE + 1) + 1;
-        ctx.moveTo(  0,   curr_y);
+        ctx.moveTo(  0  , curr_y);
         ctx.lineTo(max_x, curr_y);
     }
 }

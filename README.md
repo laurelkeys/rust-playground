@@ -98,3 +98,21 @@ Following "[Learn Rust With Entirely Too Many Linked Lists](https://rust-unoffic
     │   └── lib.rs
     └── Cargo.toml
 ```
+
+## wasm[`/`](wasm/)
+Implementation of [Conway](https://en.wikipedia.org/wiki/John_Horton_Conway)'s [Game of Life](https://en.wikipedia.org/wiki/Conway%27s_Game_of_Life), following the Rust and WebAssembly [working group](https://rustwasm.github.io/)'s "[Rust Wasm Book](https://rustwasm.github.io/docs/book/)".
+
+```bash
+.
+└── game-of-life/
+    ├── src/            # Rust code with Wasm bindings
+    │   ├── lib.rs
+    │   └── utils.rs
+    ├── www/            # JavaScript code using the generated WebAssembly
+    │   ├── index.js
+    │   ├── index.html
+    │   ├── bootstrap.js
+    │   ├── package.json
+    │   └── webpack.config.js
+    └── Cargo.toml
+```
