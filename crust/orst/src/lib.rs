@@ -1,4 +1,4 @@
-// @Todo: mergesort and heapsort.
+// @Todo: implement merge and heap sort, and plot the bench results.
 
 pub trait Sorter {
     fn sort<T: Ord>(&self, slice: &mut [T]);
@@ -14,16 +14,16 @@ pub use insertionsort::Insertion;
 pub use selectionsort::Selection;
 pub use quicksort::Quick;
 
+pub struct StdSorter;
+impl Sorter for StdSorter {
+    fn sort<T: Ord>(&self, slice: &mut [T]) {
+        slice.sort();
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    struct StdSorter;
-    impl Sorter for StdSorter {
-        fn sort<T: Ord>(&self, slice: &mut [T]) {
-            slice.sort();
-        }
-    }
 
     #[test]
     fn std_works() {
