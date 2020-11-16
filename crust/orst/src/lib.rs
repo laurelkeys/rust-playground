@@ -1,4 +1,4 @@
-// @Todo: continue from https://www.youtube.com/watch?v=h4RkCyJyXmM&t=6382s
+// @Todo: mergesort and heapsort.
 
 pub trait Sorter {
     fn sort<T: Ord>(&self, slice: &mut [T]);

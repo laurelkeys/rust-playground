@@ -13,6 +13,7 @@ struct SortEvaluator<T> {
 
 impl<T: PartialEq> PartialEq for SortEvaluator<T> {
     fn eq(&self, other: &Self) -> bool {
+        self.cmps.set(self.cmps.get() + 1);
         self.t == other.t
     }
 }
@@ -21,6 +22,7 @@ impl<T: Eq> Eq for SortEvaluator<T> {}
 
 impl<T: PartialOrd> PartialOrd for SortEvaluator<T> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.cmps.set(self.cmps.get() + 1);
         self.t.partial_cmp(&other.t)
     }
 }
@@ -40,7 +42,17 @@ fn bench<T: Ord + Clone, S: Sorter>(
     let mut values = values.to_vec();
     counter.set(0);
     sorter.sort(&mut values);
-    counter.get()
+
+    // @Note: asserting `values` is sorted also increments
+    // `counter`, so we first need to store its value.
+    let count = counter.get();
+
+    // assert!(values.is_sorted()); // nightly ;(
+    for i in 1..values.len() {
+        assert!(values[i] >= values[i - 1]);
+    }
+
+    count
 }
 
 fn main() {
@@ -48,14 +60,16 @@ fn main() {
     let counter = Rc::new(Cell::new(0));
 
     for &n in &[0, 1, 10, 100, 1000, 10_000] {
+        let mut values = Vec::with_capacity(n);
+        for _ in 0..n {
+            values.push(SortEvaluator {
+                t: rand.gen::<usize>(),
+                cmps: Rc::clone(&counter),
+            });
+        }
+
         for _ in 0..10 {
-            let mut values = Vec::with_capacity(n);
-            for _ in 0..n {
-                values.push(SortEvaluator {
-                    t: rand.gen::<usize>(),
-                    cmps: Rc::clone(&counter),
-                });
-            }
+            values.shuffle(&mut rand);
 
             let took = bench(Bubble, &values, &counter);
             println!("Bubble {} {}", n, took);

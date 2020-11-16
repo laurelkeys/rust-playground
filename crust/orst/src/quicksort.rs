@@ -16,22 +16,29 @@ fn quicksort<T: Ord>(slice: &mut [T]) {
 
     let (pivot, rest) = slice.split_first_mut().expect("slice is not empty");
 
-    // Split rest into a left side (with values less than or equal to
+    // Split `rest` into a left side (with values less than or equal to
     // the pivot) and a right side (with values greater than the pivot).
-    let mut left = 0;
-    let mut right = rest.len() - 1;
+    //
+    // `slice`: [`pivot` | ...`rest`]
+    //
+    // `rest`: [..."<=" | ... | ...">"]
+    //                  ↑     ↑
+    //               `left` `right`
 
-    while left <= right {
+    let mut left = 0; // rest[..left] is "<= pivot"
+    let mut right = rest.len(); // rest[right..] is "> pivot"
+
+    while left != right {
         if &rest[left] <= pivot {
             // Already on the correct side.
             left += 1;
-        } else if &rest[right] > pivot {
+        } else if &rest[right - 1] > pivot {
             // Already on the correct side.
             right -= 1;
         } else {
             // Move elements to the correct side (left holds a right
             // and right holds a left, so we just swap them).
-            rest.swap(left, right);
+            rest.swap(left, right - 1);
             left += 1;
             right -= 1;
         }
