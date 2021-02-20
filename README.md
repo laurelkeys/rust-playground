@@ -63,8 +63,20 @@ Coding along [Jon Gjengset](https://github.com/jonhoo)'s "[Crust of Rust](https:
 │       ├── refcell.rs  # a mutable memory location with dynamically checked borrow rules
 │       └── rc.rs       # a single-threaded reference-counting pointer
 │
-└── panama/
-    └── src/lib.rs      # "Crust of Rust: Channels"
+├── panama/
+│   └── src/lib.rs      # "Crust of Rust: Channels"
+│
+├── orst/
+│   └── src/            # "Crust of Rust: Sorting Algorithms"
+│       ├── lib.rs
+│       ├── bubblesort.rs
+│       ├── insertionsort.rs
+│       ├── selectionsort.rs
+│       ├── quicksort.rs
+│       └── bin/
+│           └── bench.rs
+└── strtok/
+    └── src/lib.rs      # "Crust of Rust: Sorting Algorithms"
 ```
 
 ## lrtdw[`/`](lrtdw/)

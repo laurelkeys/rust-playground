@@ -77,7 +77,7 @@ fn main() {
     let mut rand = rand::thread_rng();
     let counter = Rc::new(Cell::new(0));
 
-    println!("algorithm\tn\tcomparisons");
+    println!("algorithm\tn\tcomparisons\ttime");
 
     for &n in &[0, 1, 10, 100, 1000, 10_000] {
         let mut values = Vec::with_capacity(n);
