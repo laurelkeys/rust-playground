@@ -76,7 +76,7 @@ Coding along [Jon Gjengset](https://github.com/jonhoo)'s "[Crust of Rust](https:
 │       └── bin/
 │           └── bench.rs
 └── strtok/
-    └── src/lib.rs      # "Crust of Rust: Sorting Algorithms"
+    └── src/lib.rs      # "Crust of Rust: Subtyping and Variance"
 ```
 
 ## lrtdw[`/`](lrtdw/)
