@@ -75,8 +75,12 @@ Coding along [Jon Gjengset](https://github.com/jonhoo)'s "[Crust of Rust](https:
 │       ├── quicksort.rs
 │       └── bin/
 │           └── bench.rs
-└── strtok/
-    └── src/lib.rs      # "Crust of Rust: Subtyping and Variance"
+│
+├── strtok/
+|   └── src/lib.rs      # "Crust of Rust: Subtyping and Variance"
+│
+└── boks/
+    └── src/main.rs     # "Crust of Rust: The Drop Check"
 ```
 
 ## lrtdw[`/`](lrtdw/)
