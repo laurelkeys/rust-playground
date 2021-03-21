@@ -1,15 +1,23 @@
 #![feature(dropck_eyepatch)] // $ rustup override set nightly
 
-use std::marker::PhantomData;
+use std::{marker::PhantomData, ptr::NonNull};
 
 pub struct Boks<T> {
     p: *mut T,
     _t: PhantomData<T>,
 }
 
+pub struct AnnenBoks<T> {
+    // @Note: by making `p` be of type `NonNull<T>` instead of `*mut T`, we make this
+    // other ("annen") Boks covariant in its contained type T, instead of invariant.
+    p: NonNull<T>,
+    _t: PhantomData<T>,
+}
+
 // @Note: by using `#[may_dangle] T` we "promisse" to the compiler that we do not
-// access the T inside of `drop`. However, we do drop a T, so to ensure the
-// compiler knows that we now have to introduce a `PhantomData<T>`.
+// access the T inside of `drop`. However, we do drop a T, so to ensure that the
+// compiler knows that, we introduce a `PhantomData<T>`, which signals  to the
+// compiler that Boks "holds" a T (hence, it drops it when `drop` is called).
 
 unsafe impl<#[may_dangle] T> Drop for Boks<T> {
     fn drop(&mut self) {
@@ -22,11 +30,26 @@ unsafe impl<#[may_dangle] T> Drop for Boks<T> {
         unsafe { Box::from_raw(self.p) };
     }
 }
+unsafe impl<#[may_dangle] T> Drop for AnnenBoks<T> {
+    fn drop(&mut self) {
+        // @Safety: see `unsafe impl<#[may_dangle] T> Drop for Boks<T>`
+        unsafe { Box::from_raw(self.p.as_mut()) };
+    }
+}
 
 impl<T> Boks<T> {
     pub fn new(t: T) -> Self {
         Boks {
             p: Box::into_raw(Box::new(t)),
+            _t: PhantomData,
+        }
+    }
+}
+impl<T> AnnenBoks<T> {
+    pub fn new(t: T) -> Self {
+        // @Safety: `Box` never creates a null pointer.
+        AnnenBoks {
+            p: unsafe { NonNull::new_unchecked(Box::into_raw(Box::new(t))) },
             _t: PhantomData,
         }
     }
@@ -41,12 +64,25 @@ impl<T> std::ops::Deref for Boks<T> {
         unsafe { &*self.p }
     }
 }
+impl<T> std::ops::Deref for AnnenBoks<T> {
+    type Target = T;
+    fn deref(&self) -> &Self::Target {
+        // @Safety: see `impl<T> std::ops::Deref for Boks<T>`.
+        unsafe { &*self.p.as_ref() }
+    }
+}
 
 impl<T> std::ops::DerefMut for Boks<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         // @Safety: same argument above applies (see `impl<T> std::ops::Deref for Boks<T>`).
         // Also, since we have `&mut self`, no other mutable reference to `p` has been given out.
         unsafe { &mut *self.p }
+    }
+}
+impl<T> std::ops::DerefMut for AnnenBoks<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        // @Safety: see `impl<T> std::ops::DerefMut for Boks<T>`.
+        unsafe { &mut *self.p.as_mut() }
     }
 }
 
@@ -78,4 +114,25 @@ fn main() {
     //  |   let b = Boks::new(Oisann(&mut z));
     //  |   println!("{:?}", z);
     //
+    // because, while Boks does not access its generic type parameter
+    // on `drop`, it does drop the inner type T.
+
+    let s = String::from("hei");
+    // @Note: because of the invariance that gets introduced by the use of `*mut T`,
+    // a `Boks<&'static str>` cannot be treated as a `Boks<&'a str>`, where `'a` is
+    // some lifetime shorter than `'static`, even though we can use `&'static str`
+    // as `&'a str` and we can also treat `Box<&'static str>` as a `Box<&'a str>`:
+    //  |
+    //  |   let mut boks1 = Boks::new(&*s);
+    //  |   let boks2: Boks<&'static str> = Boks::new("heisann");
+    //  |   boks1 = boks2;
+    //
+    // because Box is covariant in its contained inner type T.
+    let mut box1 = Box::new(&*s);
+    let box2: Box<&'static str> = Box::new("heisann");
+    box1 = box2;
+
+    let mut annen_boks1 = AnnenBoks::new(&*s);
+    let annen_boks2: AnnenBoks<&'static str> = AnnenBoks::new("heisann");
+    annen_boks1 = annen_boks2;
 }
