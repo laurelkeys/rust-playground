@@ -118,6 +118,18 @@ Following "[Learn Rust With Entirely Too Many Linked Lists](https://rust-unoffic
     └── Cargo.toml
 ```
 
+## rusty-journal[`/`](rusty-journal/)
+Implementation of [Microsoft Learn](https://docs.microsoft.com/en-us/learn/paths/rust-first-steps/)'s "[Build a command-line to-do list program](https://docs.microsoft.com/en-us/learn/modules/rust-create-command-line-program/)" module.
+
+```bash
+.
+├── src/
+│   ├── cli.rs          # command-line interface using structopt
+│   └── main.rs
+│   └── tasks.rs        # add, complete and list tasks using serde
+└── Cargo.toml
+```
+
 ## wasm[`/`](wasm/)
 Implementation of [Conway](https://en.wikipedia.org/wiki/John_Horton_Conway)'s [Game of Life](https://en.wikipedia.org/wiki/Conway%27s_Game_of_Life), following the Rust and WebAssembly [working group](https://rustwasm.github.io/)'s "[Rust Wasm Book](https://rustwasm.github.io/docs/book/)".
 

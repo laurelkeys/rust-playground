@@ -1,0 +1,21 @@
+[package]
+name = "rusty-journal"
+version = "0.1.0"
+authors = ["tiago"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+structopt = "0.3"
+serde_json = "1.0"
+home = "0.5"
+anyhow = "1.0"
+
+[dependencies.serde]
+version = "1.0"
+features = ["derive"]
+
+[dependencies.chrono]
+version = "0.4"
+features = ["serde"]
