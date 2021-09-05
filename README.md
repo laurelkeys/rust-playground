@@ -86,6 +86,9 @@ Coding along [Jon Gjengset](https://github.com/jonhoo)'s "[Crust of Rust](https:
     └── src/main.rs     # "Crust of Rust: Atomics and Memory Ordering"
 ```
 
+## learn-wgpu[`/`](learn-wgpu/)
+Following the "[Learn Wgpu](https://sotrh.github.io/learn-wgpu/#what-is-wgpu)" guide on using [`gfx-rs`'s `wgpu`](https://github.com/gfx-rs/wgpu) library.
+
 ## lrtdw[`/`](lrtdw/)
 Following [Cliff L. Biffle](http://cliffle.com/about/)'s `unsafe`-first approach to "[Learn Rust the Dangerous Way](http://cliffle.com/p/dangerust/)" (LRtDW) series of articles.
 
