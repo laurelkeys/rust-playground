@@ -1,3 +1,4 @@
+use wgpu::util::RenderEncoder;
 use winit::{
     event::*,
     event_loop::{ControlFlow, EventLoop},
@@ -13,7 +14,12 @@ struct State {
     // @Note: size represented in physical pixels (as opposed to logical pixels).
     physical_size: winit::dpi::PhysicalSize<u32>,
     clear_color: wgpu::Color,
+    render_pipeline: wgpu::RenderPipeline,
 }
+
+const WGSL_SHADER_SOURCE_CODE: &str = include_str!("shader.wgsl");
+const VERT_SHADER_ENTRY_POINT: &str = "main"; // [[stage(vertex)]]
+const FRAG_SHADER_ENTRY_POINT: &str = "main"; // [[stage(fragment)]]
 
 impl State {
     // @Note: these two ways of writing an async new() function would be equivalent:
@@ -59,7 +65,66 @@ impl State {
 
         let clear_color = wgpu::Color::WHITE;
 
-        Self { surface, device, queue, swap_chain_desc, swap_chain, physical_size, clear_color }
+        let shader = device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+            label: Some("Shader"),
+            flags: wgpu::ShaderFlags::all(),
+            source: wgpu::ShaderSource::Wgsl(WGSL_SHADER_SOURCE_CODE.into()),
+        });
+
+        let render_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("Render Pipeline Layout"),
+                bind_group_layouts: &[],
+                push_constant_ranges: &[],
+            });
+
+        let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("Render Pipeline"),
+            layout: Some(&render_pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &shader,
+                entry_point: VERT_SHADER_ENTRY_POINT,
+                buffers: &[],
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &shader,
+                entry_point: FRAG_SHADER_ENTRY_POINT,
+                targets: &[wgpu::ColorTargetState {
+                    format: swap_chain_desc.format,
+                    blend: Some(wgpu::BlendState::REPLACE),
+                    write_mask: wgpu::ColorWrite::ALL,
+                }],
+            }),
+            primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::TriangleList,
+                strip_index_format: None,
+                front_face: wgpu::FrontFace::Ccw,
+                cull_mode: Some(wgpu::Face::Back),
+                // Requires Features::DEPTH_CLAMPING to be set to true.
+                clamp_depth: false,
+                // Requires Features::NON_FILL_POLYGON_MODE if not set to Fill.
+                polygon_mode: wgpu::PolygonMode::Fill,
+                // Requires Features::CONSERVATIVE_RASTERIZATION to be set to true.
+                conservative: false,
+            },
+            depth_stencil: None,
+            multisample: wgpu::MultisampleState {
+                count: 1,
+                mask: !0, // enables all samples
+                alpha_to_coverage_enabled: false,
+            },
+        });
+
+        Self {
+            surface,
+            device,
+            queue,
+            swap_chain_desc,
+            swap_chain,
+            physical_size,
+            clear_color,
+            render_pipeline,
+        }
     }
 
     fn resize(&mut self, new_physical_size: winit::dpi::PhysicalSize<u32>) {
@@ -101,7 +166,7 @@ impl State {
             label: Some("Render Encoder"), // @Note: debug label (used for graphics debuggers)
         });
 
-        let render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+        let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("Render Pass"),
             color_attachments: &[wgpu::RenderPassColorAttachment {
                 view: &frame.view,
@@ -110,6 +175,9 @@ impl State {
             }],
             depth_stencil_attachment: None,
         });
+
+        render_pass.set_pipeline(&self.render_pipeline);
+        render_pass.draw(0..3, 0..1); // 3 vertices, 1 instance
 
         // @Note: begin_render_pass() borrows `encoder` as `&mut self`, so we need
         // to release this mutable borrow before being able to call finish() on it.
