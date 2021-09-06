@@ -1,9 +1,53 @@
-use wgpu::util::RenderEncoder;
+// @Todo: continue from https://sotrh.github.io/learn-wgpu/beginner/tutorial4-buffer/#the-index-buffer
+
+use wgpu::util::DeviceExt;
 use winit::{
     event::*,
     event_loop::{ControlFlow, EventLoop},
     window::{Window, WindowBuilder},
 };
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+struct Vertex {
+    position: [f32; 3],
+    color: [f32; 3],
+}
+
+impl Vertex {
+    /// Returns a descriptor of how the vertex buffer is interpreted.
+    fn desc<'a>() -> wgpu::VertexBufferLayout<'a> {
+        wgpu::VertexBufferLayout {
+            array_stride: std::mem::size_of::<Vertex>() as wgpu::BufferAddress,
+            step_mode: wgpu::InputStepMode::Vertex,
+            attributes: &[
+                // position: [f32; 3],
+                wgpu::VertexAttribute {
+                    format: wgpu::VertexFormat::Float32x3,
+                    offset: 0,
+                    shader_location: 0,
+                },
+                // color: [f32; 3],
+                wgpu::VertexAttribute {
+                    format: wgpu::VertexFormat::Float32x3,
+                    offset: std::mem::size_of::<[f32; 3]>() as wgpu::BufferAddress,
+                    shader_location: 1,
+                },
+            ],
+        }
+    }
+}
+
+#[rustfmt::skip]
+const VERTICES: &[Vertex] = &[
+    Vertex { position: [ 0.0,  0.5, 0.0], color: [1.0, 0.0, 0.0] },
+    Vertex { position: [-0.5, -0.5, 0.0], color: [0.0, 1.0, 0.0] },
+    Vertex { position: [ 0.5, -0.5, 0.0], color: [0.0, 0.0, 1.0] },
+];
+
+const WGSL_SHADER_SOURCE_CODE: &str = include_str!("shader.wgsl");
+const VERT_SHADER_ENTRY_POINT: &str = "main"; // [[stage(vertex)]]
+const FRAG_SHADER_ENTRY_POINT: &str = "main"; // [[stage(fragment)]]
 
 struct State {
     surface: wgpu::Surface,
@@ -15,11 +59,9 @@ struct State {
     physical_size: winit::dpi::PhysicalSize<u32>,
     clear_color: wgpu::Color,
     render_pipeline: wgpu::RenderPipeline,
+    vertex_buffer: wgpu::Buffer,
+    vertices_count: u32,
 }
-
-const WGSL_SHADER_SOURCE_CODE: &str = include_str!("shader.wgsl");
-const VERT_SHADER_ENTRY_POINT: &str = "main"; // [[stage(vertex)]]
-const FRAG_SHADER_ENTRY_POINT: &str = "main"; // [[stage(fragment)]]
 
 impl State {
     // @Note: these two ways of writing an async new() function would be equivalent:
@@ -84,7 +126,7 @@ impl State {
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: VERT_SHADER_ENTRY_POINT,
-                buffers: &[],
+                buffers: &[Vertex::desc()],
             },
             fragment: Some(wgpu::FragmentState {
                 module: &shader,
@@ -115,6 +157,12 @@ impl State {
             },
         });
 
+        let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Vertex Buffer"),
+            contents: bytemuck::cast_slice(VERTICES),
+            usage: wgpu::BufferUsage::VERTEX,
+        });
+
         Self {
             surface,
             device,
@@ -124,6 +172,8 @@ impl State {
             physical_size,
             clear_color,
             render_pipeline,
+            vertex_buffer,
+            vertices_count: VERTICES.len() as u32,
         }
     }
 
@@ -177,7 +227,8 @@ impl State {
         });
 
         render_pass.set_pipeline(&self.render_pipeline);
-        render_pass.draw(0..3, 0..1); // 3 vertices, 1 instance
+        render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..)); // slot 0
+        render_pass.draw(0..self.vertices_count, 0..1); // 3 vertices, 1 instance
 
         // @Note: begin_render_pass() borrows `encoder` as `&mut self`, so we need
         // to release this mutable borrow before being able to call finish() on it.
