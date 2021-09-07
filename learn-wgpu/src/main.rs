@@ -1,12 +1,13 @@
-// @Todo: continue from https://sotrh.github.io/learn-wgpu/beginner/tutorial5-textures/#shader-time
+// @Todo: continue from https://sotrh.github.io/learn-wgpu/beginner/tutorial6-uniforms/
 
-use image::GenericImageView;
 use wgpu::util::DeviceExt;
 use winit::{
     event::*,
     event_loop::{ControlFlow, EventLoop},
     window::{Window, WindowBuilder},
 };
+
+mod texture;
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, bytemuck::Pod, bytemuck::Zeroable)]
@@ -70,6 +71,7 @@ struct State {
     index_buffer: wgpu::Buffer,
     indices_count: u32,
     diffuse_bind_group: wgpu::BindGroup,
+    diffuse_texture: texture::Texture,
 }
 
 impl State {
@@ -115,53 +117,9 @@ impl State {
         let swap_chain = device.create_swap_chain(&surface, &swap_chain_desc);
 
         let diffuse_bytes = include_bytes!("../assets/images/happy-tree.png");
-        let diffuse_image = image::load_from_memory(diffuse_bytes).unwrap();
-
-        let (width, height) = diffuse_image.dimensions();
-        let texture_size = wgpu::Extent3d { width, height, depth_or_array_layers: 1 };
-        assert!(width > 0 && height > 0);
-
-        let diffuse_texture = device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("diffuse_texture"),
-            size: texture_size,
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            // @Robustness: we are assuming the image is stored using sRGB.
-            format: wgpu::TextureFormat::Rgba8UnormSrgb,
-            usage: wgpu::TextureUsage::SAMPLED | wgpu::TextureUsage::COPY_DST,
-        });
-
-        let diffuse_texture_view = diffuse_texture.create_view(&wgpu::TextureViewDescriptor {
-            label: Some("diffuse_texture_view"),
-            ..wgpu::TextureViewDescriptor::default()
-        });
-
-        let diffuse_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-            label: Some("diffuse_sampler"),
-            address_mode_u: wgpu::AddressMode::ClampToEdge,
-            address_mode_v: wgpu::AddressMode::ClampToEdge,
-            address_mode_w: wgpu::AddressMode::ClampToEdge,
-            mag_filter: wgpu::FilterMode::Linear,
-            min_filter: wgpu::FilterMode::Nearest,
-            mipmap_filter: wgpu::FilterMode::Nearest,
-            ..wgpu::SamplerDescriptor::default()
-        });
-
-        queue.write_texture(
-            wgpu::ImageCopyTexture {
-                texture: &diffuse_texture,
-                mip_level: 0,
-                origin: wgpu::Origin3d::ZERO,
-            },
-            diffuse_image.as_rgba8().unwrap(),
-            wgpu::ImageDataLayout {
-                offset: 0,
-                bytes_per_row: std::num::NonZeroU32::new(4 * width), // RGBA => 4
-                rows_per_image: std::num::NonZeroU32::new(height),
-            },
-            texture_size,
-        );
+        let diffuse_texture =
+            texture::Texture::from_bytes(&device, &queue, diffuse_bytes, Some("diffuse_texture"))
+                .unwrap();
 
         let texture_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -198,11 +156,11 @@ impl State {
             entries: &[
                 wgpu::BindGroupEntry {
                     binding: 0,
-                    resource: wgpu::BindingResource::TextureView(&diffuse_texture_view),
+                    resource: wgpu::BindingResource::TextureView(&diffuse_texture.view),
                 },
                 wgpu::BindGroupEntry {
                     binding: 1,
-                    resource: wgpu::BindingResource::Sampler(&diffuse_sampler),
+                    resource: wgpu::BindingResource::Sampler(&diffuse_texture.sampler),
                 },
             ],
         });
@@ -283,6 +241,7 @@ impl State {
             index_buffer,
             indices_count: INDICES.len() as u32,
             diffuse_bind_group,
+            diffuse_texture,
         }
     }
 
