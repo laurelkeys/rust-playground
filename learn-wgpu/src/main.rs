@@ -1,5 +1,6 @@
 // @Todo: continue from https://sotrh.github.io/learn-wgpu/beginner/tutorial6-uniforms/
 
+use cgmath::{EuclideanSpace, Matrix4, Point3, Vector3, Zero};
 use wgpu::util::DeviceExt;
 use winit::{
     event::*,
@@ -8,6 +9,10 @@ use winit::{
 };
 
 mod texture;
+
+//
+// Vertex.
+//
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, bytemuck::Pod, bytemuck::Zeroable)]
@@ -56,6 +61,53 @@ const WGSL_SHADER_SOURCE_CODE: &str = include_str!("shader.wgsl");
 const VERT_SHADER_ENTRY_POINT: &str = "main"; // [[stage(vertex)]]
 const FRAG_SHADER_ENTRY_POINT: &str = "main"; // [[stage(fragment)]]
 
+//
+// Camera.
+//
+
+struct Camera {
+    eye: Point3<f32>,
+    target: Point3<f32>,
+    up: Vector3<f32>,
+    /// Camera aspect ratio.
+    aspect: f32,
+    /// Vertical field of view.
+    y_fov: cgmath::Deg<f32>,
+    /// Near clipping distance.
+    z_near: f32,
+    /// Far clipping distance.
+    z_far: f32,
+}
+
+/// Maps z coordinate values from `-1.0..=1.0` to `0.0..=1.0`.
+pub const WGPU_CLIP_FROM_OPENGL_CLIP: Matrix4<f32> = Matrix4::new(
+    1.0, 0.0, 0.0, 0.0, // 1st column
+    0.0, 1.0, 0.0, 0.0, // 2nd column
+    0.0, 0.0, 0.5, 0.0, // 3rd column
+    0.0, 0.0, 0.5, 1.0, // 4th column
+);
+
+impl Camera {
+    /// Returns a matrix that transforms world coordinates to clip coordinates, e.g.:
+    /// ```rust
+    /// let world_point = ...
+    /// let clip_from_world = Camera::build_view_projection_matrix();
+    /// let clip_point = clip_from_world * world_point; // projection
+    /// ```
+    fn build_view_projection_matrix(&self) -> Matrix4<f32> {
+        let view_from_world = Matrix4::look_at_rh(self.eye, self.target, self.up);
+        let clip_from_view = cgmath::perspective(self.y_fov, self.aspect, self.z_near, self.z_far);
+        // @Note: Wgpu's coordinate system uses NDC with the x- and y-axis in the range
+        // [-1.0, 1.0], but with the z-axis ranging from 0.0 to 1.0. However, cgmath
+        // uses the same convention as OpenGL (with z in [-1.0, 1.0] as well).
+        WGPU_CLIP_FROM_OPENGL_CLIP * clip_from_view * view_from_world
+    }
+}
+
+//
+// State.
+//
+
 struct State {
     surface: wgpu::Surface,
     device: wgpu::Device,
@@ -72,6 +124,7 @@ struct State {
     indices_count: u32,
     diffuse_bind_group: wgpu::BindGroup,
     diffuse_texture: texture::Texture,
+    camera: Camera,
 }
 
 impl State {
@@ -116,11 +169,6 @@ impl State {
         };
         let swap_chain = device.create_swap_chain(&surface, &swap_chain_desc);
 
-        let diffuse_bytes = include_bytes!("../assets/images/happy-tree.png");
-        let diffuse_texture =
-            texture::Texture::from_bytes(&device, &queue, diffuse_bytes, Some("diffuse_texture"))
-                .unwrap();
-
         let texture_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                 label: Some("texture_bind_group_layout"),
@@ -150,6 +198,10 @@ impl State {
                 ],
             });
 
+        let diffuse_bytes = include_bytes!("../assets/images/happy-tree.png");
+        let diffuse_texture =
+            texture::Texture::from_bytes(&device, &queue, diffuse_bytes, Some("diffuse_texture"))
+                .unwrap();
         let diffuse_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("diffuse_bind_group"),
             layout: &texture_bind_group_layout,
@@ -164,6 +216,16 @@ impl State {
                 },
             ],
         });
+
+        let camera = Camera {
+            eye: (0.0, 1.0, 2.0).into(), // 1 unit up and 2 units back the screen
+            target: (0.0, 0.0, 0.0).into(),
+            up: Vector3::unit_y(),
+            aspect: swap_chain_desc.width as f32 / swap_chain_desc.height as f32,
+            y_fov: cgmath::Deg(45.0),
+            z_near: 0.1,
+            z_far: 100.0,
+        };
 
         let shader = device.create_shader_module(&wgpu::ShaderModuleDescriptor {
             label: Some("shader"),
@@ -242,6 +304,7 @@ impl State {
             indices_count: INDICES.len() as u32,
             diffuse_bind_group,
             diffuse_texture,
+            camera,
         }
     }
 
