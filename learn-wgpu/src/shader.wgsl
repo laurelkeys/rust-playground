@@ -2,6 +2,17 @@
 // Vertex shader.
 //
 
+// @Note: any structure used as a `uniform` must be annotated
+// with `[[block]]`, as: `var<uniform> camera: CameraUniform`.
+
+[[block]]
+struct CameraUniform {
+    clip_from_world: mat4x4<f32>; // combined "view projection" matrix
+};
+
+[[group(1), binding(0)]] // `camera_bind_group`
+var<uniform> camera: CameraUniform;
+
 struct VertexInput {
     [[location(0)]] position: vec3<f32>;
     [[location(1)]] texcoord: vec2<f32>;
@@ -17,7 +28,7 @@ fn main(
     model: VertexInput,
 ) -> VertexOutput {
     var out: VertexOutput;
-    out.clip_position = vec4<f32>(model.position, 1.0);
+    out.clip_position = camera.clip_from_world * vec4<f32>(model.position, 1.0);
     out.texcoord = model.texcoord;
     return out;
 }
@@ -26,10 +37,10 @@ fn main(
 // Fragment shader.
 //
 
-[[group(0), binding(0)]]
+[[group(0), binding(0)]] // `diffuse_bind_group`
 var t_diffuse: texture_2d<f32>;
 
-[[group(0), binding(1)]]
+[[group(0), binding(1)]] // `diffuse_bind_group`
 var s_diffuse: sampler;
 
 [[stage(fragment)]]

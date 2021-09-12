@@ -1,6 +1,6 @@
 // @Todo: continue from https://sotrh.github.io/learn-wgpu/beginner/tutorial6-uniforms/
 
-use cgmath::{EuclideanSpace, Matrix4, Point3, Vector3, Zero};
+use cgmath::{Matrix4, Point3, Vector3};
 use wgpu::util::DeviceExt;
 use winit::{
     event::*,
@@ -105,6 +105,32 @@ impl Camera {
 }
 
 //
+// CameraUniform.
+//
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+struct CameraUniform {
+    /// Combined view ("world to view") and projection ("view to clip") matrix.
+    // @Note: we can't use cgmath directly with bytemuck, so we convert Matrix4.
+    clip_from_world: [[f32; 4]; 4],
+}
+
+impl CameraUniform {
+    fn new() -> Self {
+        use cgmath::SquareMatrix;
+
+        Self { clip_from_world: Matrix4::identity().into() }
+    }
+
+    /// Updates the combined "view projection" matrix uniform, which
+    /// is used to transform world coordinates into clip coordinates.
+    fn update_clip_from_world(&mut self, camera: &Camera) {
+        self.clip_from_world = camera.build_view_projection_matrix().into();
+    }
+}
+
+//
 // State.
 //
 
@@ -125,6 +151,9 @@ struct State {
     diffuse_bind_group: wgpu::BindGroup,
     diffuse_texture: texture::Texture,
     camera: Camera,
+    camera_uniform: CameraUniform,
+    camera_buffer: wgpu::Buffer,
+    camera_bind_group: wgpu::BindGroup,
 }
 
 impl State {
@@ -227,6 +256,39 @@ impl State {
             z_far: 100.0,
         };
 
+        let mut camera_uniform = CameraUniform::new();
+        camera_uniform.update_clip_from_world(&camera);
+
+        let camera_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("camera_buffer"),
+            contents: bytemuck::cast_slice(&[camera_uniform]),
+            usage: wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
+        });
+
+        let camera_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("camera_bind_group_layout"),
+                entries: &[wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStage::VERTEX,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                }],
+            });
+
+        let camera_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("camera_bind_group"),
+            layout: &camera_bind_group_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: camera_buffer.as_entire_binding(),
+            }],
+        });
+
         let shader = device.create_shader_module(&wgpu::ShaderModuleDescriptor {
             label: Some("shader"),
             flags: wgpu::ShaderFlags::all(),
@@ -236,7 +298,7 @@ impl State {
         let render_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("render_pipeline_layout"),
-                bind_group_layouts: &[&texture_bind_group_layout],
+                bind_group_layouts: &[&texture_bind_group_layout, &camera_bind_group_layout],
                 push_constant_ranges: &[],
             });
 
@@ -305,6 +367,9 @@ impl State {
             diffuse_bind_group,
             diffuse_texture,
             camera,
+            camera_uniform,
+            camera_buffer,
+            camera_bind_group,
         }
     }
 
@@ -359,6 +424,7 @@ impl State {
 
         render_pass.set_pipeline(&self.render_pipeline);
         render_pass.set_bind_group(0, &self.diffuse_bind_group, &[]); // group 0
+        render_pass.set_bind_group(1, &self.camera_bind_group, &[]); // group 1
         render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..)); // slot 0
         render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
         render_pass.draw_indexed(0..self.indices_count, 0, 0..1);
