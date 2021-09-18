@@ -1,6 +1,6 @@
-// @Todo: continue from https://sotrh.github.io/learn-wgpu/beginner/tutorial7-instancing/#the-instance-buffer
+// @Todo: continue from https://sotrh.github.io/learn-wgpu/beginner/tutorial8-depth/#sorting-from-back-to-front
 
-use cgmath::{Matrix4, Point3, Vector3};
+use cgmath::{InnerSpace, Matrix4, Point3, Quaternion, Rotation3, Vector3, Zero};
 use wgpu::util::DeviceExt;
 use winit::{
     event::*,
@@ -148,6 +148,8 @@ bitflags! {
     }
 }
 
+// @Todo: replace this with https://github.com/h3r2tic/dolly
+// (then, it'd also make sense to replace cgmath with glam).
 struct CameraController {
     speed: f32,
     is_pressed: IsPressed,
@@ -193,8 +195,6 @@ impl CameraController {
     }
 
     fn update_camera(&self, camera: &mut Camera) {
-        use cgmath::InnerSpace;
-
         let forward = camera.target - camera.eye;
         let forward_mag = forward.magnitude();
         let forward = forward / forward_mag; // forward.normalize()
@@ -224,6 +224,77 @@ impl CameraController {
 }
 
 //
+// InstanceRaw.
+//
+
+#[repr(C)]
+#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+struct InstanceRaw {
+    /// `Instace` transform represented as a 4x4 "model" matrix, which
+    /// takes the model's local coordinate system to world coordinates.
+    world_from_local: [[f32; 4]; 4],
+}
+
+impl InstanceRaw {
+    /// Returns a descriptor of how the vertex buffer is interpreted.
+    fn desc<'a>() -> wgpu::VertexBufferLayout<'a> {
+        wgpu::VertexBufferLayout {
+            array_stride: std::mem::size_of::<InstanceRaw>() as wgpu::BufferAddress,
+            step_mode: wgpu::InputStepMode::Instance,
+            attributes: &[
+                // world_from_local: [[f32; 4]; 4],
+                // @Note: a mat4 takes up 4 vertex slots as it is technically equivalent
+                // to four vec4's... we will need to reassemble it in the shader then.
+                // @Note: we are starting at a higher slot than we currently need to,
+                // so that we leave space for using new locations in `Vertex` later.
+                wgpu::VertexAttribute {
+                    format: wgpu::VertexFormat::Float32x4,
+                    offset: 0,
+                    shader_location: 5,
+                },
+                wgpu::VertexAttribute {
+                    format: wgpu::VertexFormat::Float32x4,
+                    offset: std::mem::size_of::<[f32; 4]>() as wgpu::BufferAddress,
+                    shader_location: 5 + 1,
+                },
+                wgpu::VertexAttribute {
+                    format: wgpu::VertexFormat::Float32x4,
+                    offset: std::mem::size_of::<[f32; 4 * 2]>() as wgpu::BufferAddress,
+                    shader_location: 5 + 2,
+                },
+                wgpu::VertexAttribute {
+                    format: wgpu::VertexFormat::Float32x4,
+                    offset: std::mem::size_of::<[f32; 4 * 3]>() as wgpu::BufferAddress,
+                    shader_location: 5 + 3,
+                },
+            ],
+        }
+    }
+}
+
+//
+// Instance.
+//
+
+struct Instance {
+    position: Vector3<f32>,
+    rotation: Quaternion<f32>,
+}
+
+impl Instance {
+    fn to_raw(&self) -> InstanceRaw {
+        let world_from_local =
+            Matrix4::from_translation(self.position) * Matrix4::from(self.rotation);
+        InstanceRaw { world_from_local: world_from_local.into() }
+    }
+}
+
+const INSTANCES_PER_ROW_COUNT: u32 = 10;
+const INSTANCES_TOTAL_COUNT: u32 = INSTANCES_PER_ROW_COUNT * INSTANCES_PER_ROW_COUNT;
+const INSTANCE_DISPLACEMENT: Vector3<f32> =
+    Vector3::new(0.5 * INSTANCES_PER_ROW_COUNT as f32, 0.0, 0.5 * INSTANCES_PER_ROW_COUNT as f32);
+
+//
 // State.
 //
 
@@ -248,6 +319,8 @@ struct State {
     camera_buffer: wgpu::Buffer,
     camera_bind_group: wgpu::BindGroup,
     camera_controller: CameraController,
+    instances: Vec<Instance>,
+    instance_buffer: wgpu::Buffer,
 }
 
 impl State {
@@ -402,7 +475,7 @@ impl State {
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: VERT_SHADER_ENTRY_POINT,
-                buffers: &[Vertex::desc()],
+                buffers: &[Vertex::desc(), InstanceRaw::desc()],
             },
             fragment: Some(wgpu::FragmentState {
                 module: &shader,
@@ -445,6 +518,26 @@ impl State {
             usage: wgpu::BufferUsage::INDEX,
         });
 
+        let instances = (0..INSTANCES_PER_ROW_COUNT)
+            .flat_map(|z| {
+                (0..INSTANCES_PER_ROW_COUNT).map(move |x| {
+                    let position = Vector3 { x: x as f32, y: 0.0, z: z as f32 };
+                    let rotation = if position.is_zero() {
+                        Quaternion::from_axis_angle(Vector3::unit_z(), cgmath::Deg(0.0))
+                    } else {
+                        Quaternion::from_axis_angle(position.normalize(), cgmath::Deg(45.0))
+                    };
+                    Instance { position, rotation }
+                })
+            })
+            .collect::<Vec<_>>();
+        let instance_data = instances.iter().map(Instance::to_raw).collect::<Vec<_>>();
+        let instance_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("instance_buffer"),
+            contents: bytemuck::cast_slice(&instance_data),
+            usage: wgpu::BufferUsage::VERTEX,
+        });
+
         Self {
             surface,
             device,
@@ -465,6 +558,8 @@ impl State {
             camera_buffer,
             camera_bind_group,
             camera_controller: CameraController::new(0.2),
+            instances,
+            instance_buffer,
         }
     }
 
@@ -519,8 +614,9 @@ impl State {
         render_pass.set_bind_group(0, &self.diffuse_bind_group, &[]); // group 0
         render_pass.set_bind_group(1, &self.camera_bind_group, &[]); // group 1
         render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..)); // slot 0
+        render_pass.set_vertex_buffer(1, self.instance_buffer.slice(..)); // slot 1
         render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-        render_pass.draw_indexed(0..self.indices_count, 0, 0..1);
+        render_pass.draw_indexed(0..self.indices_count, 0, 0..self.instances.len() as u32);
 
         // @Note: begin_render_pass() borrows `encoder` as `&mut self`, so we need
         // to release this mutable borrow before being able to call finish() on it.

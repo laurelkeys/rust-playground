@@ -13,6 +13,13 @@ struct CameraUniform {
 [[group(1), binding(0)]] // `camera_bind_group`
 var<uniform> camera: CameraUniform;
 
+struct InstanceInput {
+    [[location(5)]] world_from_local_0: vec4<f32>;
+    [[location(6)]] world_from_local_1: vec4<f32>;
+    [[location(7)]] world_from_local_2: vec4<f32>;
+    [[location(8)]] world_from_local_3: vec4<f32>;
+};
+
 struct VertexInput {
     [[location(0)]] position: vec3<f32>;
     [[location(1)]] texcoord: vec2<f32>;
@@ -26,9 +33,17 @@ struct VertexOutput {
 [[stage(vertex)]]
 fn main(
     model: VertexInput,
+    instance: InstanceInput,
 ) -> VertexOutput {
+    let world_from_local = mat4x4<f32>(
+        instance.world_from_local_0,
+        instance.world_from_local_1,
+        instance.world_from_local_2,
+        instance.world_from_local_3
+    );
+
     var out: VertexOutput;
-    out.clip_position = camera.clip_from_world * vec4<f32>(model.position, 1.0);
+    out.clip_position = camera.clip_from_world * world_from_local * vec4<f32>(model.position, 1.0);
     out.texcoord = model.texcoord;
     return out;
 }
