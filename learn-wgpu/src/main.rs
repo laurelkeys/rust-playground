@@ -1,4 +1,4 @@
-// @Todo: continue from https://sotrh.github.io/learn-wgpu/beginner/tutorial8-depth/#sorting-from-back-to-front
+// @Todo: continue from https://sotrh.github.io/learn-wgpu/beginner/tutorial9-models/#accessing-files-in-the-res-folder
 
 use cgmath::{InnerSpace, Matrix4, Point3, Quaternion, Rotation3, Vector3, Zero};
 use wgpu::util::DeviceExt;
@@ -313,6 +313,7 @@ struct State {
     indices_count: u32,
     diffuse_bind_group: wgpu::BindGroup,
     diffuse_texture: texture::Texture,
+    depth_texture: texture::Texture,
     camera: Camera,
     camera_uniform: CameraUniform,
     camera_buffer: wgpu::Buffer,
@@ -335,8 +336,9 @@ impl State {
         let physical_size = window.inner_size();
 
         // @Note: the instance is a handle to our GPU.
-        // PRIMARY   = Vulkan + Metal + DX12 + Browser WebGPU
-        // SECONDARY = OpenGL + DX11
+        //  - all() = PRIMARY + SECONDARY
+        //  - PRIMARY = Vulkan + Metal + DX12 + Browser WebGPU
+        //  - SECONDARY = OpenGL + DX11
         let instance = wgpu::Instance::new(wgpu::Backends::all());
 
         // @Safety: `window` is a valid object to create a surface upon.
@@ -412,6 +414,9 @@ impl State {
             ],
         });
 
+        let depth_texture =
+            texture::Texture::create_depth_texture(&device, &config, Some("depth_texture"));
+
         let camera = Camera {
             eye: (0.0, 1.0, 2.0).into(), // 1 unit up and 2 units back the screen
             target: (0.0, 0.0, 0.0).into(),
@@ -428,7 +433,7 @@ impl State {
         let camera_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("camera_buffer"),
             contents: bytemuck::cast_slice(&[camera_uniform]),
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::UNIFORM,
         });
 
         let camera_bind_group_layout =
@@ -496,7 +501,13 @@ impl State {
                 // Requires Features::CONSERVATIVE_RASTERIZATION to be set to true.
                 conservative: false,
             },
-            depth_stencil: None,
+            depth_stencil: Some(wgpu::DepthStencilState {
+                format: texture::Texture::DEPTH_FORMAT,
+                depth_write_enabled: true,
+                depth_compare: wgpu::CompareFunction::Less,
+                stencil: wgpu::StencilState::default(),
+                bias: wgpu::DepthBiasState::default(),
+            }),
             multisample: wgpu::MultisampleState {
                 count: 1,
                 mask: !0, // enables all samples
@@ -550,6 +561,7 @@ impl State {
             indices_count: INDICES.len() as u32,
             diffuse_bind_group,
             diffuse_texture,
+            depth_texture,
             camera,
             camera_uniform,
             camera_buffer,
@@ -571,6 +583,14 @@ impl State {
         self.config.width = new_physical_size.width;
         self.config.height = new_physical_size.height;
         self.surface.configure(&self.device, &self.config);
+
+        // Recreate the depth texture, since we have changed config,
+        // and depth_texture must be the same size as the surface's.
+        self.depth_texture = texture::Texture::create_depth_texture(
+            &self.device,
+            &self.config,
+            Some("depth_texture"),
+        );
     }
 
     /// Indicates whether or not an event has been fully processed.
@@ -614,7 +634,11 @@ impl State {
                 resolve_target: None,
                 ops: wgpu::Operations { load: wgpu::LoadOp::Clear(self.clear_color), store: true },
             }],
-            depth_stencil_attachment: None,
+            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                view: &self.depth_texture.view,
+                depth_ops: Some(wgpu::Operations { load: wgpu::LoadOp::Clear(1.0), store: true }),
+                stencil_ops: None,
+            }),
         });
 
         render_pass.set_pipeline(&self.render_pipeline);
