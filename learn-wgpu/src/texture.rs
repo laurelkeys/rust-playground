@@ -8,6 +8,8 @@ pub struct Texture {
 }
 
 impl Texture {
+    pub const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
+
     pub fn from_bytes(
         device: &wgpu::Device,
         queue: &wgpu::Queue,
@@ -37,7 +39,7 @@ impl Texture {
             dimension: wgpu::TextureDimension::D2,
             // @Robustness: we are assuming the image is stored using sRGB.
             format: wgpu::TextureFormat::Rgba8UnormSrgb,
-            usage: wgpu::TextureUsage::SAMPLED | wgpu::TextureUsage::COPY_DST,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
         });
 
         queue.write_texture(
@@ -45,6 +47,7 @@ impl Texture {
                 texture: &texture,
                 mip_level: 0,
                 origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
             },
             image.as_rgba8().unwrap(),
             wgpu::ImageDataLayout {
