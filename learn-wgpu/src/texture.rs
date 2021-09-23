@@ -1,5 +1,6 @@
 use anyhow::*;
 use image::GenericImageView;
+use std::path::Path;
 
 pub struct Texture {
     pub texture: wgpu::Texture,
@@ -93,7 +94,7 @@ impl Texture {
                 origin: wgpu::Origin3d::ZERO,
                 aspect: wgpu::TextureAspect::All,
             },
-            image.as_rgba8().unwrap(),
+            &image.to_rgba8(),
             wgpu::ImageDataLayout {
                 offset: 0,
                 bytes_per_row: std::num::NonZeroU32::new(4 * width), // RGBA => 4
@@ -115,5 +116,14 @@ impl Texture {
         });
 
         Ok(Self { texture, view, sampler })
+    }
+
+    pub fn load<P>(device: &wgpu::Device, queue: &wgpu::Queue, path: P) -> Result<Self>
+    where
+        P: AsRef<Path>,
+    {
+        let image = image::open(&path)?;
+        let label = path.as_ref().to_str();
+        Self::from_image(device, queue, &image, label)
     }
 }
