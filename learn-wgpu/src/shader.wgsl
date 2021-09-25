@@ -1,5 +1,5 @@
 //
-// Vertex shader.
+// Vertex shader
 //
 
 // @Note: any structure used as a `uniform` must be annotated
@@ -49,7 +49,7 @@ fn main(
 }
 
 //
-// Fragment shader.
+// Fragment shader
 //
 
 [[group(0), binding(0)]] // `diffuse_bind_group`
