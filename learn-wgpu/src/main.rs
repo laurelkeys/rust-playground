@@ -1,4 +1,4 @@
-// @Todo: continue from https://sotrh.github.io/learn-wgpu/intermediate/tutorial10-lighting/#ray-path-tracing
+// @Todo: continue from https://sotrh.github.io/learn-wgpu/intermediate/tutorial10-lighting/#ambient-lighting
 
 use std::path::Path;
 
@@ -13,15 +13,10 @@ use winit::{
 mod model;
 mod texture;
 
-use crate::model::{DrawModel, Vertex};
-
-const WGSL_LIGHT_SOURCE_CODE: &str = include_str!("light.wgsl");
-const WGSL_SHADER_SOURCE_CODE: &str = include_str!("shader.wgsl");
-const VERT_SHADER_ENTRY_POINT: &str = "main"; // [[stage(vertex)]]
-const FRAG_SHADER_ENTRY_POINT: &str = "main"; // [[stage(fragment)]]
+use crate::model::{DrawLight, DrawModel, Vertex};
 
 //
-// Camera
+// Camera, CameraUniform
 //
 
 struct Camera {
@@ -86,6 +81,17 @@ impl CameraUniform {
     }
 }
 
+//
+// CameraController
+//
+
+// @Todo: replace this with https://github.com/h3r2tic/dolly
+// (then, it'd also make sense to replace cgmath with glam).
+struct CameraController {
+    speed: f32,
+    is_pressed: IsPressed,
+}
+
 use bitflags::bitflags;
 
 bitflags! {
@@ -98,13 +104,6 @@ bitflags! {
         const FORWARD  = 0b010000;
         const BACKWARD = 0b100000;
     }
-}
-
-// @Todo: replace this with https://github.com/h3r2tic/dolly
-// (then, it'd also make sense to replace cgmath with glam).
-struct CameraController {
-    speed: f32,
-    is_pressed: IsPressed,
 }
 
 impl CameraController {
@@ -176,7 +175,7 @@ impl CameraController {
 }
 
 //
-// Light
+// LightUniform
 //
 
 #[repr(C)]
@@ -195,7 +194,7 @@ impl LightUniform {
 }
 
 //
-// Instance
+// Instance, InstanceRaw
 //
 
 struct Instance {
@@ -275,6 +274,7 @@ struct State {
 
     clear_color: wgpu::Color,
 
+    light_render_pipeline: wgpu::RenderPipeline,
     render_pipeline: wgpu::RenderPipeline,
 
     camera: Camera,
@@ -310,12 +310,12 @@ fn create_render_pipeline(
         layout: Some(layout),
         vertex: wgpu::VertexState {
             module: &shader,
-            entry_point: VERT_SHADER_ENTRY_POINT,
+            entry_point: "main",
             buffers: vertex_buffers_layouts,
         },
         fragment: Some(wgpu::FragmentState {
             module: &shader,
-            entry_point: FRAG_SHADER_ENTRY_POINT,
+            entry_point: "main",
             targets: &[wgpu::ColorTargetState {
                 format: color_format,
                 blend: Some(wgpu::BlendState::REPLACE),
@@ -513,6 +513,26 @@ impl State {
         // Render pipeline(s) configuration.
         //
 
+        let light_render_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("light_render_pipeline_layout"),
+                // Bind groups that this pipeline uses:
+                bind_group_layouts: &[&camera_bind_group_layout, &light_bind_group_layout],
+                push_constant_ranges: &[],
+            });
+
+        let light_render_pipeline = create_render_pipeline(
+            &device,
+            &light_render_pipeline_layout,
+            wgpu::ShaderModuleDescriptor {
+                label: Some("light.wgsl"),
+                source: wgpu::ShaderSource::Wgsl(include_str!("light.wgsl").into()),
+            },
+            config.format,
+            Some(texture::Texture::DEPTH_FORMAT),
+            &[model::ModelVertex::desc()],
+        );
+
         let render_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("render_pipeline_layout"),
@@ -530,30 +550,11 @@ impl State {
             &render_pipeline_layout,
             wgpu::ShaderModuleDescriptor {
                 label: Some("shader.wgsl"),
-                source: wgpu::ShaderSource::Wgsl(WGSL_SHADER_SOURCE_CODE.into()),
+                source: wgpu::ShaderSource::Wgsl(include_str!("shader.wgsl").into()),
             },
             config.format,
             Some(texture::Texture::DEPTH_FORMAT),
             &[model::ModelVertex::desc(), InstanceRaw::desc()],
-        );
-
-        let light_render_pipeline_layout =
-            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                label: Some("light_render_pipeline_layout"),
-                bind_group_layouts: &[&camera_bind_group_layout, &light_bind_group_layout],
-                push_constant_ranges: &[],
-            });
-
-        let light_render_pipeline_layout = create_render_pipeline(
-            &device,
-            &light_render_pipeline_layout,
-            wgpu::ShaderModuleDescriptor {
-                label: Some("light.wgsl"),
-                source: wgpu::ShaderSource::Wgsl(WGSL_LIGHT_SOURCE_CODE.into()),
-            },
-            config.format,
-            Some(texture::Texture::DEPTH_FORMAT),
-            &[model::ModelVertex::desc()],
         );
 
         let depth_texture =
@@ -604,6 +605,7 @@ impl State {
             config,
             physical_size,
             clear_color: wgpu::Color::WHITE,
+            light_render_pipeline,
             render_pipeline,
             camera,
             camera_controller: CameraController::new(0.2),
@@ -696,8 +698,16 @@ impl State {
             }),
         });
 
-        render_pass.set_pipeline(&self.render_pipeline);
         render_pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
+
+        render_pass.set_pipeline(&self.light_render_pipeline);
+        render_pass.draw_light_model(
+            &self.cube_model,
+            &self.camera_bind_group,
+            &self.light_bind_group,
+        );
+
+        render_pass.set_pipeline(&self.render_pipeline);
         render_pass.draw_model_instanced(
             &self.cube_model,
             &self.camera_bind_group,
