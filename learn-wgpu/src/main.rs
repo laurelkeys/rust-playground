@@ -1,8 +1,8 @@
-// @Todo: continue from https://sotrh.github.io/learn-wgpu/intermediate/tutorial10-lighting/#ambient-lighting
+// @Todo: continue from https://sotrh.github.io/learn-wgpu/intermediate/tutorial10-lighting/#specular-lighting
 
 use std::path::Path;
 
-use cgmath::{InnerSpace, Matrix4, Point3, Quaternion, Rotation3, Vector3, Zero};
+use cgmath::{InnerSpace, Matrix3, Matrix4, Point3, Quaternion, Rotation3, Vector3, Zero};
 use wgpu::util::DeviceExt;
 use winit::{
     event::*,
@@ -204,9 +204,13 @@ struct Instance {
 
 impl Instance {
     fn to_raw(&self) -> InstanceRaw {
-        let world_from_local =
-            Matrix4::from_translation(self.position) * Matrix4::from(self.rotation);
-        InstanceRaw { world_from_local: world_from_local.into() }
+        let rotation = Matrix4::from(self.rotation);
+        let world_from_local = (Matrix4::from_translation(self.position) * rotation).into();
+
+        // @Todo: "truncate" rotation from a Matrix4 to a Matrix3, avoiding recomputation.
+        let world_normal_from_local_normal = Matrix3::from(self.rotation).into();
+
+        InstanceRaw { world_from_local, world_normal_from_local_normal }
     }
 }
 
@@ -216,10 +220,13 @@ struct InstanceRaw {
     /// `Instace` transform represented as a 4x4 "model" matrix, which
     /// takes the model's local coordinate system to world coordinates.
     world_from_local: [[f32; 4]; 4],
+    // @Note: we only need the rotation component of the transformation
+    // matrix for normals (as it doesn't make sense to translate them),
+    // hence why we use a 3x3 instead of a 4x4 representation for it.
+    world_normal_from_local_normal: [[f32; 3]; 3],
 }
 
-impl InstanceRaw {
-    /// Returns a descriptor of how the vertex buffer is interpreted.
+impl model::Vertex for InstanceRaw {
     fn desc<'a>() -> wgpu::VertexBufferLayout<'a> {
         wgpu::VertexBufferLayout {
             array_stride: std::mem::size_of::<InstanceRaw>() as wgpu::BufferAddress,
@@ -238,27 +245,39 @@ impl InstanceRaw {
                 wgpu::VertexAttribute {
                     format: wgpu::VertexFormat::Float32x4,
                     offset: std::mem::size_of::<[f32; 4]>() as wgpu::BufferAddress,
-                    shader_location: 5 + 1,
+                    shader_location: 6,
                 },
                 wgpu::VertexAttribute {
                     format: wgpu::VertexFormat::Float32x4,
                     offset: std::mem::size_of::<[f32; 4 * 2]>() as wgpu::BufferAddress,
-                    shader_location: 5 + 2,
+                    shader_location: 7,
                 },
                 wgpu::VertexAttribute {
                     format: wgpu::VertexFormat::Float32x4,
                     offset: std::mem::size_of::<[f32; 4 * 3]>() as wgpu::BufferAddress,
-                    shader_location: 5 + 3,
+                    shader_location: 8,
+                },
+                // world_normal_from_local_normal: [[f32; 3]; 3],
+                // @Note: just like mat4 above, we represent a mat3 using three vec3's.
+                wgpu::VertexAttribute {
+                    format: wgpu::VertexFormat::Float32x3,
+                    offset: std::mem::size_of::<[f32; 4 * 4]>() as wgpu::BufferAddress,
+                    shader_location: 9,
+                },
+                wgpu::VertexAttribute {
+                    format: wgpu::VertexFormat::Float32x3,
+                    offset: std::mem::size_of::<[f32; 4 * 4 + 3]>() as wgpu::BufferAddress,
+                    shader_location: 10,
+                },
+                wgpu::VertexAttribute {
+                    format: wgpu::VertexFormat::Float32x3,
+                    offset: std::mem::size_of::<[f32; 4 * 4 + 3 * 2]>() as wgpu::BufferAddress,
+                    shader_location: 11,
                 },
             ],
         }
     }
 }
-
-const INSTANCES_PER_ROW_COUNT: u32 = 10;
-const INSTANCES_TOTAL_COUNT: u32 = INSTANCES_PER_ROW_COUNT * INSTANCES_PER_ROW_COUNT;
-const INSTANCE_DISPLACEMENT: Vector3<f32> =
-    Vector3::new(0.5 * INSTANCES_PER_ROW_COUNT as f32, 0.0, 0.5 * INSTANCES_PER_ROW_COUNT as f32);
 
 //
 // State
@@ -561,14 +580,15 @@ impl State {
             texture::Texture::create_depth_texture(&device, &config, Some("depth_texture"));
 
         const SPACE_BETWEEN_INSTANCES: f32 = 3.0;
-        const HALF_INSTANCES_PER_ROW_COUNT: f32 = 0.5 * INSTANCES_PER_ROW_COUNT as f32;
+        const INSTANCES_PER_ROW_COUNT: u32 = 10;
+        const INSTANCES_PER_ROW_HALF_COUNT: f32 = 0.5 * INSTANCES_PER_ROW_COUNT as f32;
 
         let instances = (0..INSTANCES_PER_ROW_COUNT)
             .flat_map(|z| {
                 (0..INSTANCES_PER_ROW_COUNT).map(move |x| {
                     let position = {
-                        let x = SPACE_BETWEEN_INSTANCES * (x as f32 - HALF_INSTANCES_PER_ROW_COUNT);
-                        let z = SPACE_BETWEEN_INSTANCES * (z as f32 - HALF_INSTANCES_PER_ROW_COUNT);
+                        let x = SPACE_BETWEEN_INSTANCES * (x as f32 - INSTANCES_PER_ROW_HALF_COUNT);
+                        let z = SPACE_BETWEEN_INSTANCES * (z as f32 - INSTANCES_PER_ROW_HALF_COUNT);
                         Vector3 { x, y: 0.0, z }
                     };
 
@@ -604,7 +624,7 @@ impl State {
             queue,
             config,
             physical_size,
-            clear_color: wgpu::Color::WHITE,
+            clear_color: wgpu::Color { r: 0.1, g: 0.2, b: 0.3, a: 1.0 },
             light_render_pipeline,
             render_pipeline,
             camera,
