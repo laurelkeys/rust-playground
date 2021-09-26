@@ -106,68 +106,72 @@ impl Model {
         // @Robustness: we assume that the textures are stored with the .obj file.
         let folder = path.as_ref().parent().context("Path to model has no parent")?;
 
-        let mut materials = Vec::new();
-        for m in obj_materials {
-            let diffuse_texture =
-                texture::Texture::load(device, queue, folder.join(m.diffuse_texture))?;
+        let materials = obj_materials
+            .into_iter()
+            .map(|m| {
+                let diffuse_texture =
+                    texture::Texture::load(device, queue, folder.join(m.diffuse_texture))?;
 
-            let diffuse_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-                label: Some("diffuse_bind_group"),
-                layout,
-                entries: &[
-                    wgpu::BindGroupEntry {
-                        binding: 0,
-                        resource: wgpu::BindingResource::TextureView(&diffuse_texture.view),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 1,
-                        resource: wgpu::BindingResource::Sampler(&diffuse_texture.sampler),
-                    },
-                ],
-            });
-
-            materials.push(Material { name: m.name, diffuse_texture, diffuse_bind_group })
-        }
-
-        let mut meshes = Vec::new();
-        for m in obj_models {
-            let mut vertices = Vec::new();
-            for i in 0..m.mesh.positions.len() / 3 {
-                vertices.push(ModelVertex {
-                    position: [
-                        m.mesh.positions[i * 3],
-                        m.mesh.positions[i * 3 + 1],
-                        m.mesh.positions[i * 3 + 2],
-                    ],
-                    texcoord: [m.mesh.texcoords[i * 2], m.mesh.texcoords[i * 2 + 1]],
-                    normal: [
-                        m.mesh.normals[i * 3],
-                        m.mesh.normals[i * 3 + 1],
-                        m.mesh.normals[i * 3 + 2],
+                let diffuse_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+                    label: Some("diffuse_bind_group"),
+                    layout,
+                    entries: &[
+                        wgpu::BindGroupEntry {
+                            binding: 0,
+                            resource: wgpu::BindingResource::TextureView(&diffuse_texture.view),
+                        },
+                        wgpu::BindGroupEntry {
+                            binding: 1,
+                            resource: wgpu::BindingResource::Sampler(&diffuse_texture.sampler),
+                        },
                     ],
                 });
-            }
 
-            let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some(&format!("{:?} vertex_buffer", path.as_ref())),
-                contents: bytemuck::cast_slice(&vertices),
-                usage: wgpu::BufferUsages::VERTEX,
-            });
+                Ok(Material { name: m.name, diffuse_texture, diffuse_bind_group })
+            })
+            .collect::<Result<Vec<Material>>>()?;
 
-            let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some(&format!("{:?} index_buffer", path.as_ref())),
-                contents: bytemuck::cast_slice(&m.mesh.indices),
-                usage: wgpu::BufferUsages::INDEX,
-            });
+        let meshes = obj_models
+            .into_iter()
+            .map(|m| {
+                let vertices = (0..m.mesh.positions.len() / 3)
+                    .into_iter()
+                    .map(|i| ModelVertex {
+                        position: [
+                            m.mesh.positions[i * 3],
+                            m.mesh.positions[i * 3 + 1],
+                            m.mesh.positions[i * 3 + 2],
+                        ],
+                        texcoord: [m.mesh.texcoords[i * 2], m.mesh.texcoords[i * 2 + 1]],
+                        normal: [
+                            m.mesh.normals[i * 3],
+                            m.mesh.normals[i * 3 + 1],
+                            m.mesh.normals[i * 3 + 2],
+                        ],
+                    })
+                    .collect::<Vec<_>>();
 
-            meshes.push(Mesh {
-                name: m.name,
-                vertex_buffer,
-                index_buffer,
-                indices_count: m.mesh.indices.len() as u32,
-                material_index: m.mesh.material_id.unwrap_or(0),
-            });
-        }
+                let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some(&format!("{:?} vertex_buffer", path.as_ref())),
+                    contents: bytemuck::cast_slice(&vertices),
+                    usage: wgpu::BufferUsages::VERTEX,
+                });
+
+                let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some(&format!("{:?} index_buffer", path.as_ref())),
+                    contents: bytemuck::cast_slice(&m.mesh.indices),
+                    usage: wgpu::BufferUsages::INDEX,
+                });
+
+                Ok(Mesh {
+                    name: m.name,
+                    vertex_buffer,
+                    index_buffer,
+                    indices_count: m.mesh.indices.len() as u32,
+                    material_index: m.mesh.material_id.unwrap_or(0),
+                })
+            })
+            .collect::<Result<Vec<Mesh>>>()?;
 
         Ok(Self { meshes, materials })
     }

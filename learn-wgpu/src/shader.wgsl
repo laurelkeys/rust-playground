@@ -94,12 +94,14 @@ fn main(
 ) -> [[location(0)]] vec4<f32> {
     let view_dir = normalize(camera.world_position.xyz - in.world_position);
     let light_dir = normalize(light.world_position - in.world_position);
-    let reflect_dir = reflect(-light_dir, in.world_normal);
+    let hafway_dir = normalize(view_dir + light_dir); // Blinn-Phong
+    // let reflect_dir = reflect(-light_dir, in.world_normal); // Phong
 
     let object_color = textureSample(t_diffuse, s_diffuse, in.texcoord);
     let ambient_color = light.color * 0.1;
     let diffuse_color = light.color * max(dot(in.world_normal, light_dir), 0.0);
-    let specular_color = light.color * pow(max(dot(view_dir, reflect_dir), 0.0), 32.0);
+    let specular_color = light.color * pow(max(dot(in.world_normal, hafway_dir), 0.0), 32.0);
+    // let specular_color = light.color * pow(max(dot(view_dir, reflect_dir), 0.0), 32.0);
 
     let final_color = (ambient_color + diffuse_color + specular_color) * object_color.xyz;
 

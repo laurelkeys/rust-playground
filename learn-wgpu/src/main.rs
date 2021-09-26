@@ -1,4 +1,4 @@
-// @Todo: continue from https://sotrh.github.io/learn-wgpu/intermediate/tutorial10-lighting/#the-half-direction
+// @Todo: continue from https://sotrh.github.io/learn-wgpu/intermediate/tutorial11-normals/
 
 use std::path::Path;
 
