@@ -5,9 +5,11 @@
 // @Note: any structure used as a `uniform` must be annotated
 // with `[[block]]`, as: `var<uniform> camera: CameraUniform`.
 
+// @Volatile: sync this with `CameraUniform` from main.rs.
 [[block]]
 struct CameraUniform {
-    clip_from_world: mat4x4<f32>; // combined "view projection" matrix
+    world_position: vec4<f32>;
+    clip_from_world: mat4x4<f32>;
 };
 
 [[group(1), binding(0)]] // `camera_bind_group`
@@ -15,7 +17,7 @@ var<uniform> camera: CameraUniform;
 
 [[block]]
 struct LightUniform {
-    position: vec3<f32>;
+    world_position: vec3<f32>;
     color: vec3<f32>;
 };
 
@@ -90,13 +92,16 @@ var s_diffuse: sampler;
 fn main(
     in: VertexOutput
 ) -> [[location(0)]] vec4<f32> {
-    let light_dir = normalize(light.position - in.world_position);
+    let view_dir = normalize(camera.world_position.xyz - in.world_position);
+    let light_dir = normalize(light.world_position - in.world_position);
+    let reflect_dir = reflect(-light_dir, in.world_normal);
 
     let object_color = textureSample(t_diffuse, s_diffuse, in.texcoord);
     let ambient_color = light.color * 0.1;
     let diffuse_color = light.color * max(dot(in.world_normal, light_dir), 0.0);
+    let specular_color = light.color * pow(max(dot(view_dir, reflect_dir), 0.0), 32.0);
 
-    let final_color = (ambient_color + diffuse_color) * object_color.xyz;
+    let final_color = (ambient_color + diffuse_color + specular_color) * object_color.xyz;
 
     return vec4<f32>(final_color, object_color.a);
 }

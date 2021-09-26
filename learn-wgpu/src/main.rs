@@ -1,4 +1,4 @@
-// @Todo: continue from https://sotrh.github.io/learn-wgpu/intermediate/tutorial10-lighting/#specular-lighting
+// @Todo: continue from https://sotrh.github.io/learn-wgpu/intermediate/tutorial10-lighting/#the-half-direction
 
 use std::path::Path;
 
@@ -55,9 +55,13 @@ impl Camera {
     }
 }
 
+// @Volatile: keep shader.wgsl and light.wgsl synced with this.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 struct CameraUniform {
+    /// Camera position in "world space" coordinates.
+    // @Note: store 4 floats because of uniforms' 16 byte spacing requirement.
+    world_position: [f32; 4],
     /// Combined view ("world to view") and projection ("view to clip") matrix.
     // @Note: we can't use cgmath directly with bytemuck, so we convert Matrix4.
     clip_from_world: [[f32; 4]; 4],
@@ -67,12 +71,13 @@ impl CameraUniform {
     fn new() -> Self {
         use cgmath::SquareMatrix;
 
-        Self { clip_from_world: Matrix4::identity().into() }
+        Self { world_position: [0.0; 4], clip_from_world: Matrix4::identity().into() }
     }
 
     /// Updates the combined "view projection" matrix uniform, which
     /// is used to transform world coordinates into clip coordinates.
     fn update_clip_from_world(&mut self, camera: &Camera) {
+        self.world_position = camera.eye.to_homogeneous().into();
         // @Note: Wgpu's coordinate system uses NDC with the x- and y-axis in the range
         // [-1.0, 1.0], but with the z-axis ranging from 0.0 to 1.0. However, cgmath
         // uses the same convention as OpenGL (with z in [-1.0, 1.0] as well).
@@ -181,7 +186,7 @@ impl CameraController {
 #[repr(C)]
 #[derive(Clone, Copy, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 struct LightUniform {
-    position: [f32; 3],
+    world_position: [f32; 3],
     // @Note: since uniforms require 16 byte spacing, we add a padding field.
     _padding: u32,
     color: [f32; 3],
@@ -189,7 +194,7 @@ struct LightUniform {
 
 impl LightUniform {
     fn new(position: [f32; 3], color: [f32; 3]) -> Self {
-        Self { position, _padding: 0, color }
+        Self { world_position: position, _padding: 0, color }
     }
 }
 
@@ -473,7 +478,7 @@ impl State {
                 label: Some("camera_bind_group_layout"),
                 entries: &[wgpu::BindGroupLayoutEntry {
                     binding: 0,
-                    visibility: wgpu::ShaderStages::VERTEX,
+                    visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
                     ty: wgpu::BindingType::Buffer {
                         ty: wgpu::BufferBindingType::Uniform,
                         has_dynamic_offset: false,
@@ -680,10 +685,10 @@ impl State {
             bytemuck::cast_slice(&[self.camera_uniform]),
         );
 
-        let old_position = Vector3::from(self.light_uniform.position);
+        let old_position = Vector3::from(self.light_uniform.world_position);
         let new_position =
             Quaternion::from_axis_angle(Vector3::unit_y(), cgmath::Deg(1.0)) * old_position;
-        self.light_uniform.position = new_position.into();
+        self.light_uniform.world_position = new_position.into();
         self.queue.write_buffer(&self.light_buffer, 0, bytemuck::cast_slice(&[self.light_uniform]));
     }
 
