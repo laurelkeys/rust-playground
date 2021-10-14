@@ -6,7 +6,7 @@ use wgpu::util::DeviceExt;
 use crate::texture;
 
 //
-// Vertex
+// Vertex, ModelVertex
 //
 
 pub trait Vertex {
@@ -162,91 +162,7 @@ impl Model {
         let meshes = obj_models
             .into_iter()
             .map(|model| {
-                #[derive(Clone, Copy)]
-                struct TangentBitangent(Vector3<f32>, Vector3<f32>);
-                struct PositionTexcoordNormal(Vector3<f32>, Vector2<f32>, Vector3<f32>);
-
-                let tobj::Mesh { positions, normals, texcoords, indices, .. } = &model.mesh;
-
-                assert!(indices.len() % 3 == 0);
-                assert!(positions.len() % 3 == 0);
-                let vertices_count = positions.len() / 3;
-
-                let vertices_without_tangent_and_bitangent = (0..vertices_count)
-                    .map(|i| {
-                        PositionTexcoordNormal(
-                            Vector3 {
-                                x: positions[i * 3],
-                                y: positions[i * 3 + 1],
-                                z: positions[i * 3 + 2],
-                            },
-                            Vector2 { x: texcoords[i * 2], y: texcoords[i * 2 + 1] },
-                            Vector3 {
-                                x: normals[i * 3],
-                                y: normals[i * 3 + 1],
-                                z: normals[i * 3 + 2],
-                            },
-                        )
-                    })
-                    .collect::<Vec<_>>();
-
-                let vertices_tangent_and_bitangent = indices.chunks_exact(3).into_iter().fold(
-                    vec![TangentBitangent(Vector3::zero(), Vector3::zero()); vertices_count],
-                    |mut vertices_tangent_and_bitangent, is| {
-                        let (i0, i1, i2) = (is[0] as usize, is[1] as usize, is[2] as usize);
-
-                        let (
-                            PositionTexcoordNormal(position0, texcoord0, _),
-                            PositionTexcoordNormal(position1, texcoord1, _),
-                            PositionTexcoordNormal(position2, texcoord2, _),
-                        ) = (
-                            &vertices_without_tangent_and_bitangent[i0],
-                            &vertices_without_tangent_and_bitangent[i1],
-                            &vertices_without_tangent_and_bitangent[i2],
-                        );
-
-                        let (d_xyz01, d_xyz02) = (position1 - position0, position2 - position0);
-                        let (d_uv01, d_uv02) = (texcoord1 - texcoord0, texcoord2 - texcoord0);
-
-                        // Compute the tangent and bitangent vectors T and B, such that:
-                        //   d_xyz01 == d_uv01.x * T + d_uv01.y * B
-                        //   d_xyz02 == d_uv02.x * T + d_uv01.y * B
-                        let r = 1.0 / (d_uv01.x * d_uv02.y - d_uv01.y * d_uv02.x);
-                        let tangent = r * (d_xyz01 * d_uv02.y - d_xyz02 * d_uv01.y);
-                        let bitangent = r * (d_xyz02 * d_uv01.x - d_xyz01 * d_uv02.x);
-
-                        // @Note: we use the same values for each vertex in the triangle.
-                        vertices_tangent_and_bitangent[i0].0 += tangent;
-                        vertices_tangent_and_bitangent[i0].1 += bitangent;
-                        vertices_tangent_and_bitangent[i1].0 += tangent;
-                        vertices_tangent_and_bitangent[i1].1 += bitangent;
-                        vertices_tangent_and_bitangent[i2].0 += tangent;
-                        vertices_tangent_and_bitangent[i2].1 += bitangent;
-
-                        vertices_tangent_and_bitangent
-                    },
-                );
-
-                let vertices = vertices_without_tangent_and_bitangent
-                    .into_iter()
-                    .zip(vertices_tangent_and_bitangent.into_iter())
-                    .map(
-                        |(
-                            PositionTexcoordNormal(position, texcoord, normal),
-                            TangentBitangent(tangent, bitangent),
-                        )| {
-                            cgmath::assert_abs_diff_eq!(normal.magnitude2(), 1.0, epsilon = 0.001);
-
-                            ModelVertex {
-                                position: position.into(),
-                                texcoord: texcoord.into(),
-                                normal: normal.into(),
-                                tangent: tangent.normalize().into(),
-                                bitangent: bitangent.normalize().into(),
-                            }
-                        },
-                    )
-                    .collect::<Vec<_>>();
+                let vertices = vertices_from_obj_model(&model);
 
                 let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
                     label: Some(&format!("{:?} vertex_buffer", path.as_ref())),
@@ -256,7 +172,7 @@ impl Model {
 
                 let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
                     label: Some(&format!("{:?} index_buffer", path.as_ref())),
-                    contents: bytemuck::cast_slice(indices),
+                    contents: bytemuck::cast_slice(&model.mesh.indices),
                     usage: wgpu::BufferUsages::INDEX,
                 });
 
@@ -264,7 +180,7 @@ impl Model {
                     name: model.name,
                     vertex_buffer,
                     index_buffer,
-                    indices_count: indices.len() as u32,
+                    indices_count: model.mesh.indices.len() as u32,
                     material_index: model.mesh.material_id.unwrap_or(0),
                 })
             })
@@ -272,6 +188,86 @@ impl Model {
 
         Ok(Self { meshes, materials })
     }
+}
+
+fn vertices_from_obj_model(model: &tobj::Model) -> Vec<ModelVertex> {
+    #[derive(Clone, Copy)]
+    struct TangentBitangent(Vector3<f32>, Vector3<f32>);
+
+    struct PositionTexcoordNormal(Vector3<f32>, Vector2<f32>, Vector3<f32>);
+
+    let tobj::Mesh { positions, normals, texcoords, indices, .. } = &model.mesh;
+    assert!(indices.len() % 3 == 0);
+    assert!(positions.len() % 3 == 0);
+    let vertices_count = positions.len() / 3;
+
+    let vertices_without_tangent_and_bitangent = (0..vertices_count)
+        .map(|i| {
+            PositionTexcoordNormal(
+                Vector3::from([positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]]),
+                Vector2::from([texcoords[i * 2], texcoords[i * 2 + 1]]),
+                Vector3::from([normals[i * 3], normals[i * 3 + 1], normals[i * 3 + 2]]),
+            )
+        })
+        .collect::<Vec<_>>();
+
+    let vertices_tangent_and_bitangent = indices.chunks_exact(3).fold(
+        vec![TangentBitangent(Vector3::zero(), Vector3::zero()); vertices_count],
+        |mut vertices_tangent_and_bitangent, is| {
+            let (i0, i1, i2) = (is[0] as usize, is[1] as usize, is[2] as usize);
+
+            let (
+                PositionTexcoordNormal(position0, texcoord0, _),
+                PositionTexcoordNormal(position1, texcoord1, _),
+                PositionTexcoordNormal(position2, texcoord2, _),
+            ) = (
+                &vertices_without_tangent_and_bitangent[i0],
+                &vertices_without_tangent_and_bitangent[i1],
+                &vertices_without_tangent_and_bitangent[i2],
+            );
+
+            let (d_xyz01, d_xyz02) = (position1 - position0, position2 - position0);
+            let (d_uv01, d_uv02) = (texcoord1 - texcoord0, texcoord2 - texcoord0);
+
+            // Compute the tangent and bitangent vectors T and B, such that:
+            //   d_xyz01 == d_uv01.x * T + d_uv01.y * B
+            //   d_xyz02 == d_uv02.x * T + d_uv01.y * B
+            let rcp = 1.0 / (d_uv01.x * d_uv02.y - d_uv01.y * d_uv02.x);
+            let tangent = rcp * (d_uv02.y * d_xyz01 - d_uv01.y * d_xyz02);
+            let bitangent = rcp * (d_uv01.x * d_xyz02 - d_uv02.x * d_xyz01);
+
+            // @Note: we use the same values for each vertex in the triangle.
+            vertices_tangent_and_bitangent[i0].0 += tangent;
+            vertices_tangent_and_bitangent[i0].1 += bitangent;
+            vertices_tangent_and_bitangent[i1].0 += tangent;
+            vertices_tangent_and_bitangent[i1].1 += bitangent;
+            vertices_tangent_and_bitangent[i2].0 += tangent;
+            vertices_tangent_and_bitangent[i2].1 += bitangent;
+
+            vertices_tangent_and_bitangent
+        },
+    );
+
+    vertices_without_tangent_and_bitangent
+        .into_iter()
+        .zip(vertices_tangent_and_bitangent)
+        .map(
+            |(
+                PositionTexcoordNormal(position, texcoord, normal),
+                TangentBitangent(tangent, bitangent),
+            )| {
+                cgmath::assert_abs_diff_eq!(normal.magnitude2(), 1.0, epsilon = 0.001);
+
+                ModelVertex {
+                    position: position.into(),
+                    texcoord: texcoord.into(),
+                    normal: normal.into(),
+                    tangent: tangent.normalize().into(),
+                    bitangent: bitangent.normalize().into(),
+                }
+            },
+        )
+        .collect::<Vec<_>>()
 }
 
 pub trait DrawModel<'a> {
