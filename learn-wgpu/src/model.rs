@@ -125,10 +125,18 @@ impl Model {
         let materials = obj_materials
             .into_iter()
             .map(|material| {
-                let diffuse_texture =
-                    texture::Texture::load(device, queue, folder.join(material.diffuse_texture))?;
-                let normal_texture =
-                    texture::Texture::load(device, queue, folder.join(material.normal_texture))?;
+                let diffuse_texture = texture::Texture::load(
+                    device,
+                    queue,
+                    folder.join(material.diffuse_texture),
+                    texture::TextureIsSrgb::Encoded,
+                )?;
+                let normal_texture = texture::Texture::load(
+                    device,
+                    queue,
+                    folder.join(material.normal_texture),
+                    texture::TextureIsSrgb::Linear,
+                )?;
 
                 let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
                     label: Some("bind_group"),

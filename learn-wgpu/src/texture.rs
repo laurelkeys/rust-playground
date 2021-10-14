@@ -12,6 +12,14 @@ pub struct Texture {
     pub sampler: wgpu::Sampler,
 }
 
+/// Assuming texture images use the sRGB color space, as they very often do,
+/// this represents whether its colors are stored linearly or non-linearly.
+// @Note: an "encoded" sRGB color has the sRGB OETF applied.
+pub enum TextureIsSrgb {
+    Linear,
+    Encoded,
+}
+
 impl Texture {
     //
     // Depth textures.
@@ -65,9 +73,10 @@ impl Texture {
         queue: &wgpu::Queue,
         bytes: &[u8],
         label: Option<&str>,
+        srgb: TextureIsSrgb,
     ) -> Result<Self> {
         let image = image::load_from_memory(bytes)?;
-        Self::from_image(device, queue, &image, label)
+        Self::from_image(device, queue, &image, label, srgb)
     }
 
     pub fn from_image(
@@ -75,6 +84,7 @@ impl Texture {
         queue: &wgpu::Queue,
         image: &image::DynamicImage,
         label: Option<&str>,
+        srgb: TextureIsSrgb,
     ) -> Result<Self> {
         let (width, height) = image.dimensions();
         anyhow::ensure!(width > 0 && height > 0);
@@ -87,8 +97,10 @@ impl Texture {
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
-            // @Robustness: we are assuming the image is stored using sRGB.
-            format: wgpu::TextureFormat::Rgba8UnormSrgb,
+            format: match srgb {
+                TextureIsSrgb::Linear => wgpu::TextureFormat::Rgba8Unorm,
+                TextureIsSrgb::Encoded => wgpu::TextureFormat::Rgba8UnormSrgb,
+            },
             usage: wgpu::TextureUsages::COPY_DST | wgpu::TextureUsages::TEXTURE_BINDING,
         });
 
@@ -123,12 +135,17 @@ impl Texture {
         Ok(Self { texture, view, sampler })
     }
 
-    pub fn load<P>(device: &wgpu::Device, queue: &wgpu::Queue, path: P) -> Result<Self>
+    pub fn load<P>(
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        path: P,
+        srgb: TextureIsSrgb,
+    ) -> Result<Self>
     where
         P: AsRef<Path>,
     {
         let image = image::open(&path)?;
         let label = path.as_ref().to_str();
-        Self::from_image(device, queue, &image, label)
+        Self::from_image(device, queue, &image, label, srgb)
     }
 }
