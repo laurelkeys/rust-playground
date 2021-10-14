@@ -1,4 +1,5 @@
-// @Todo: continue from https://sotrh.github.io/learn-wgpu/intermediate/tutorial11-normals/
+// @Todo: continue from https://sotrh.github.io/learn-wgpu/intermediate/tutorial11-normals/#world-space-to-tangent-space
+// @Todo: update wgpu 0.10 -> 0.11.
 
 use std::path::Path;
 
@@ -240,8 +241,7 @@ impl model::Vertex for InstanceRaw {
                 // world_from_local: [[f32; 4]; 4],
                 // @Note: a mat4 takes up 4 vertex slots as it is technically equivalent
                 // to four vec4's... we will need to reassemble it in the shader then.
-                // @Note: we are starting at a higher slot than we currently need to,
-                // so that we leave space for using new locations in `Vertex` later.
+                // @Note: we start at slot 5 since `ModelVertex`'s desc() uses 0 to 4.
                 wgpu::VertexAttribute {
                     format: wgpu::VertexFormat::Float32x4,
                     offset: 0,
@@ -425,6 +425,7 @@ impl State {
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                 label: Some("texture_bind_group_layout"),
                 entries: &[
+                    // Diffuse texture:
                     wgpu::BindGroupLayoutEntry {
                         binding: 0,
                         visibility: wgpu::ShaderStages::FRAGMENT,
@@ -445,6 +446,23 @@ impl State {
                             // @Note: this is only for `TextureSampleType::Depth`.
                             comparison: false,
                         },
+                        count: None,
+                    },
+                    // Normal map texture:
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 2,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            multisampled: false,
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 3,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Sampler { filtering: true, comparison: false },
                         count: None,
                     },
                 ],

@@ -12,7 +12,7 @@ struct CameraUniform {
     clip_from_world: mat4x4<f32>;
 };
 
-[[group(1), binding(0)]] // `camera_bind_group`
+[[group(1), binding(0)]]
 var<uniform> camera: CameraUniform;
 
 [[block]]
@@ -21,7 +21,7 @@ struct LightUniform {
     color: vec3<f32>;
 };
 
-[[group(2), binding(0)]] // `light_bind_group`
+[[group(2), binding(0)]]
 var<uniform> light: LightUniform;
 
 struct InstanceInput {
@@ -82,11 +82,15 @@ fn main(
 // Fragment shader
 //
 
-[[group(0), binding(0)]] // `diffuse_bind_group`
+[[group(0), binding(0)]]
 var t_diffuse: texture_2d<f32>;
-
-[[group(0), binding(1)]] // `diffuse_bind_group`
+[[group(0), binding(1)]]
 var s_diffuse: sampler;
+
+[[group(0), binding(2)]]
+var t_normal: texture_2d<f32>;
+[[group(0), binding(3)]]
+var s_normal: sampler;
 
 [[stage(fragment)]]
 fn main(
@@ -97,10 +101,18 @@ fn main(
     let hafway_dir = normalize(view_dir + light_dir); // Blinn-Phong
     // let reflect_dir = reflect(-light_dir, in.world_normal); // Phong
 
+    let object_normal = textureSample(t_normal, s_normal, in.texcoord);
+    let tangent_normal = object_normal.xyz * 2.0 - 1.0;
+    // let world_normal_from_tangent_normal = mat3x3<f32>(
+    //     // @Fixme: x-axis (right)
+    //     // @Fixme: y-axis (up)
+    //     // @Fixme: z-axis (forward)
+    // );
+
     let object_color = textureSample(t_diffuse, s_diffuse, in.texcoord);
     let ambient_color = light.color * 0.1;
-    let diffuse_color = light.color * max(dot(in.world_normal, light_dir), 0.0);
-    let specular_color = light.color * pow(max(dot(in.world_normal, hafway_dir), 0.0), 32.0);
+    let diffuse_color = light.color * max(dot(tangent_normal, light_dir), 0.0); // let diffuse_color = light.color * max(dot(in.world_normal, light_dir), 0.0);
+    let specular_color = light.color * pow(max(dot(tangent_normal, hafway_dir), 0.0), 32.0); // let specular_color = light.color * pow(max(dot(in.world_normal, hafway_dir), 0.0), 32.0);
     // let specular_color = light.color * pow(max(dot(view_dir, reflect_dir), 0.0), 32.0);
 
     let final_color = (ambient_color + diffuse_color + specular_color) * object_color.xyz;
