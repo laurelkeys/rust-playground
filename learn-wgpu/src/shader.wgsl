@@ -38,14 +38,19 @@ struct VertexInput {
     [[location(0)]] position: vec3<f32>;
     [[location(1)]] texcoord: vec2<f32>;
     [[location(2)]] normal: vec3<f32>;
+    [[location(3)]] tangent: vec3<f32>;
+    [[location(4)]] bitangent: vec3<f32>;
 };
 
 struct VertexOutput {
     [[builtin(position)]] clip_position: vec4<f32>; // @Note: analogous to gl_Position
     [[location(0)]] texcoord: vec2<f32>;
-    [[location(1)]] world_normal: vec3<f32>;
-    [[location(2)]] world_position: vec3<f32>;
+    [[location(1)]] tangent_position: vec3<f32>;
+    [[location(2)]] tangent_view_position: vec3<f32>;
+    [[location(3)]] tangent_light_position: vec3<f32>;
 };
+
+// @Fixme: lighting is messed up when using tangent space instead of world space values.
 
 [[stage(vertex)]]
 fn main(
@@ -66,15 +71,25 @@ fn main(
     );
 
     // @Robustness: at the moment, everything is being computed in world space
-    // instead of view space (which minimizes floating-point precision erros).
+    // instead of view space (which minimizes floating-point precision errors).
     let world_position = world_from_local * vec4<f32>(model.position, 1.0);
     let world_normal = world_normal_from_local_normal * model.normal;
+    let world_tangent = world_normal_from_local_normal * model.tangent;
+    let world_bitangent = world_normal_from_local_normal * model.bitangent;
+
+    // Assemble the "TBN matrix", used to transforms vectors to tangent space.
+    let tangent_from_world = transpose(mat3x3<f32>(
+        world_tangent, // normalize(world_tangent),
+        world_bitangent, // normalize(world_bitangent),
+        world_normal, // normalize(world_normal),
+    ));
 
     var out: VertexOutput;
     out.clip_position = camera.clip_from_world * world_position;
     out.texcoord = model.texcoord;
-    out.world_normal = world_normal;
-    out.world_position = world_position.xyz;
+    out.tangent_position = tangent_from_world * world_position.xyz;
+    out.tangent_view_position = tangent_from_world * light.world_position;
+    out.tangent_light_position = tangent_from_world * camera.world_position.xyz;
     return out;
 }
 
@@ -96,18 +111,17 @@ var s_normal: sampler;
 fn main(
     in: VertexOutput
 ) -> [[location(0)]] vec4<f32> {
-    let view_dir = normalize(camera.world_position.xyz - in.world_position);
-    let light_dir = normalize(light.world_position - in.world_position);
+    let view_dir = normalize(in.tangent_view_position - in.tangent_position);
+    // let view_dir = normalize(camera.world_position.xyz - in.world_position);
+
+    let light_dir = normalize(in.tangent_light_position - in.tangent_position);
+    // let light_dir = normalize(light.world_position - in.world_position);
+
     let hafway_dir = normalize(view_dir + light_dir); // Blinn-Phong
     // let reflect_dir = reflect(-light_dir, in.world_normal); // Phong
 
     let object_normal = textureSample(t_normal, s_normal, in.texcoord);
     let tangent_normal = object_normal.xyz * 2.0 - 1.0;
-    // let world_normal_from_tangent_normal = mat3x3<f32>(
-    //     // @Fixme: x-axis (right)
-    //     // @Fixme: y-axis (up)
-    //     // @Fixme: z-axis (forward)
-    // );
 
     let object_color = textureSample(t_diffuse, s_diffuse, in.texcoord);
     let ambient_color = light.color * 0.1;

@@ -1,4 +1,4 @@
-// @Todo: continue from https://sotrh.github.io/learn-wgpu/intermediate/tutorial11-normals/#world-space-to-tangent-space
+// @Todo: continue from https://sotrh.github.io/learn-wgpu/intermediate/tutorial11-normals/#srgb-and-normal-textures
 // @Todo: update wgpu 0.10 -> 0.11.
 
 use std::path::Path;
