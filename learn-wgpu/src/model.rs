@@ -88,6 +88,43 @@ pub struct Material {
     pub bind_group: wgpu::BindGroup,
 }
 
+impl Material {
+    pub fn new(
+        device: &wgpu::Device,
+        layout: &wgpu::BindGroupLayout,
+        name: &str,
+        diffuse_texture: texture::Texture,
+        normal_texture: texture::Texture,
+    ) -> Self {
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some(name),
+            layout,
+            entries: &[
+                // Diffuse texture:
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&diffuse_texture.view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&diffuse_texture.sampler),
+                },
+                // Normal map texture:
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: wgpu::BindingResource::TextureView(&normal_texture.view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: wgpu::BindingResource::Sampler(&normal_texture.sampler),
+                },
+            ],
+        });
+
+        Self { name: String::from(name), diffuse_texture, normal_texture, bind_group }
+    }
+}
+
 //
 // Model, DrawModel
 //
@@ -131,6 +168,7 @@ impl Model {
                     folder.join(material.diffuse_texture),
                     texture::TextureIsSrgb::Encoded,
                 )?;
+
                 let normal_texture = texture::Texture::load(
                     device,
                     queue,
@@ -138,32 +176,7 @@ impl Model {
                     texture::TextureIsSrgb::Linear,
                 )?;
 
-                let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-                    label: Some("bind_group"),
-                    layout,
-                    entries: &[
-                        // Diffuse texture:
-                        wgpu::BindGroupEntry {
-                            binding: 0,
-                            resource: wgpu::BindingResource::TextureView(&diffuse_texture.view),
-                        },
-                        wgpu::BindGroupEntry {
-                            binding: 1,
-                            resource: wgpu::BindingResource::Sampler(&diffuse_texture.sampler),
-                        },
-                        // Normal map texture:
-                        wgpu::BindGroupEntry {
-                            binding: 2,
-                            resource: wgpu::BindingResource::TextureView(&normal_texture.view),
-                        },
-                        wgpu::BindGroupEntry {
-                            binding: 3,
-                            resource: wgpu::BindingResource::Sampler(&normal_texture.sampler),
-                        },
-                    ],
-                });
-
-                Ok(Material { name: material.name, diffuse_texture, normal_texture, bind_group })
+                Ok(Material::new(device, layout, &material.name, diffuse_texture, normal_texture))
             })
             .collect::<Result<Vec<Material>>>()?;
 
@@ -308,6 +321,14 @@ pub trait DrawModel<'a> {
         light_bind_group: &'a wgpu::BindGroup,
         instances: Range<u32>,
     );
+    fn draw_model_instanced_with_material(
+        &mut self,
+        model: &'a Model,
+        camera_bind_group: &'a wgpu::BindGroup,
+        light_bind_group: &'a wgpu::BindGroup,
+        instances: Range<u32>,
+        material: &'a Material,
+    );
 }
 
 impl<'renderpass, 'a> DrawModel<'a> for wgpu::RenderPass<'renderpass>
@@ -360,6 +381,26 @@ where
     ) {
         for mesh in &model.meshes {
             let material = &model.materials[mesh.material_index];
+            self.draw_mesh_instanced(
+                mesh,
+                material,
+                camera_bind_group,
+                light_bind_group,
+                instances.clone(),
+            );
+        }
+    }
+
+    fn draw_model_instanced_with_material(
+        &mut self,
+        model: &'a Model,
+        camera_bind_group: &'a wgpu::BindGroup,
+        light_bind_group: &'a wgpu::BindGroup,
+        instances: Range<u32>,
+        material: &'a Material,
+    ) {
+        // Override `model.materials[mesh.material_index]` with the given `material`.
+        for mesh in &model.meshes {
             self.draw_mesh_instanced(
                 mesh,
                 material,

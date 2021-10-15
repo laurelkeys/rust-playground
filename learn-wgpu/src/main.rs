@@ -1,4 +1,4 @@
-// @Todo: continue from https://sotrh.github.io/learn-wgpu/intermediate/tutorial11-normals/#unrelated-stuff
+// @Todo: continue from https://sotrh.github.io/learn-wgpu/intermediate/tutorial12-camera/#the-camera
 // @Todo: update wgpu 0.10 -> 0.11.
 
 use std::path::Path;
@@ -317,6 +317,7 @@ struct State {
     instance_buffer: wgpu::Buffer,
 
     cube_model: model::Model,
+    debug_material: model::Material,
 }
 
 fn create_render_pipeline(
@@ -633,13 +634,41 @@ impl State {
         });
 
         let assets_dir = Path::new(env!("OUT_DIR")).join("assets");
+        let cube_model_dir = assets_dir.join("models").join("cube");
+
         let cube_model = model::Model::load(
             &device,
             &queue,
             &texture_bind_group_layout,
-            assets_dir.join("models").join("cube").join("cube.obj"),
+            cube_model_dir.join("cube.obj"),
         )
         .unwrap();
+
+        let debug_material = {
+            let diffuse_texture = texture::Texture::load(
+                &device,
+                &queue,
+                cube_model_dir.join("cobble-diffuse.png"),
+                texture::TextureIsSrgb::Encoded,
+            )
+            .unwrap();
+
+            let normal_texture = texture::Texture::load(
+                &device,
+                &queue,
+                cube_model_dir.join("cobble-normal.png"),
+                texture::TextureIsSrgb::Linear,
+            )
+            .unwrap();
+
+            model::Material::new(
+                &device,
+                &texture_bind_group_layout,
+                "debug-material",
+                diffuse_texture,
+                normal_texture,
+            )
+        };
 
         Self {
             surface,
@@ -662,6 +691,7 @@ impl State {
             instances,
             instance_buffer,
             cube_model,
+            debug_material,
         }
     }
 
@@ -751,12 +781,22 @@ impl State {
         );
 
         render_pass.set_pipeline(&self.render_pipeline);
-        render_pass.draw_model_instanced(
-            &self.cube_model,
-            &self.camera_bind_group,
-            &self.light_bind_group,
-            0..self.instances.len() as u32,
-        );
+        const USE_DEBUG_MATERIAL: bool = false;
+        match USE_DEBUG_MATERIAL {
+            true => render_pass.draw_model_instanced_with_material(
+                &self.cube_model,
+                &self.camera_bind_group,
+                &self.light_bind_group,
+                0..self.instances.len() as u32,
+                &self.debug_material,
+            ),
+            false => render_pass.draw_model_instanced(
+                &self.cube_model,
+                &self.camera_bind_group,
+                &self.light_bind_group,
+                0..self.instances.len() as u32,
+            ),
+        }
 
         // @Note: begin_render_pass() borrows `encoder` as `&mut self`, so we need
         // to release this mutable borrow before being able to call finish() on it.
