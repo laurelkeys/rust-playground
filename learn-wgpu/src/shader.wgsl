@@ -50,8 +50,6 @@ struct VertexOutput {
     [[location(3)]] tangent_light_position: vec3<f32>;
 };
 
-// @Fixme: lighting is messed up when using tangent space instead of world space values.
-
 [[stage(vertex)]]
 fn main(
     model: VertexInput,
@@ -79,17 +77,17 @@ fn main(
 
     // Assemble the "TBN matrix", used to transforms vectors to tangent space.
     let tangent_from_world = transpose(mat3x3<f32>(
-        world_tangent, // normalize(world_tangent),
-        world_bitangent, // normalize(world_bitangent),
-        world_normal, // normalize(world_normal),
+        normalize(world_tangent), // world_tangent,
+        normalize(world_bitangent), // world_bitangent,
+        normalize(world_normal), // world_normal,
     ));
 
     var out: VertexOutput;
     out.clip_position = camera.clip_from_world * world_position;
     out.texcoord = model.texcoord;
     out.tangent_position = tangent_from_world * world_position.xyz;
-    out.tangent_view_position = tangent_from_world * light.world_position;
-    out.tangent_light_position = tangent_from_world * camera.world_position.xyz;
+    out.tangent_view_position = tangent_from_world * camera.world_position.xyz;
+    out.tangent_light_position = tangent_from_world * light.world_position;
     return out;
 }
 
@@ -111,12 +109,8 @@ var s_normal: sampler;
 fn main(
     in: VertexOutput
 ) -> [[location(0)]] vec4<f32> {
-    let view_dir = normalize(in.tangent_view_position - in.tangent_position);
-    // let view_dir = normalize(camera.world_position.xyz - in.world_position);
-
-    let light_dir = normalize(in.tangent_light_position - in.tangent_position);
-    // let light_dir = normalize(light.world_position - in.world_position);
-
+    let view_dir = normalize(in.tangent_view_position - in.tangent_position); // normalize(camera.world_position.xyz - in.world_position);
+    let light_dir = normalize(in.tangent_light_position - in.tangent_position); // normalize(light.world_position - in.world_position);
     let hafway_dir = normalize(view_dir + light_dir); // Blinn-Phong
     // let reflect_dir = reflect(-light_dir, in.world_normal); // Phong
 
@@ -125,8 +119,8 @@ fn main(
 
     let object_color = textureSample(t_diffuse, s_diffuse, in.texcoord);
     let ambient_color = light.color * 0.1;
-    let diffuse_color = light.color * max(dot(tangent_normal, light_dir), 0.0); // let diffuse_color = light.color * max(dot(in.world_normal, light_dir), 0.0);
-    let specular_color = light.color * pow(max(dot(tangent_normal, hafway_dir), 0.0), 32.0); // let specular_color = light.color * pow(max(dot(in.world_normal, hafway_dir), 0.0), 32.0);
+    let diffuse_color = light.color * max(dot(tangent_normal, light_dir), 0.0); // light.color * max(dot(in.world_normal, light_dir), 0.0);
+    let specular_color = light.color * pow(max(dot(tangent_normal, hafway_dir), 0.0), 32.0); // light.color * pow(max(dot(in.world_normal, hafway_dir), 0.0), 32.0);
     // let specular_color = light.color * pow(max(dot(view_dir, reflect_dir), 0.0), 32.0);
 
     let final_color = (ambient_color + diffuse_color + specular_color) * object_color.xyz;
