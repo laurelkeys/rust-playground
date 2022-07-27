@@ -1,10 +1,9 @@
 // @Todo: continue from https://sotrh.github.io/learn-wgpu/intermediate/tutorial12-camera/#the-camera
-// @Todo: update wgpu 0.10 -> 0.11.
 
 use std::path::Path;
 
-use cgmath::{InnerSpace, Matrix3, Matrix4, Quaternion, Rotation3, Vector3, Zero};
-use wgpu::util::DeviceExt;
+use cgmath::{Deg, InnerSpace, Matrix3, Matrix4, Quaternion, Rotation3, Vector3, Zero};
+use wgpu::{include_wgsl, util::DeviceExt};
 use winit::{
     event::*,
     event_loop::{ControlFlow, EventLoop},
@@ -26,14 +25,14 @@ use crate::model::{DrawLight, DrawModel, Vertex};
 #[derive(Clone, Copy, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 struct LightUniform {
     world_position: [f32; 3],
-    // @Note: since uniforms require 16 byte spacing, we add a padding field.
-    _padding: u32,
+    _pad0: u32, // @Note: uniforms require 16 byte spacing, so we add padding
     color: [f32; 3],
+    _pad1: u32, // ditto (see https://www.w3.org/TR/WGSL/#alignment-and-size)
 }
 
 impl LightUniform {
     fn new(position: [f32; 3], color: [f32; 3]) -> Self {
-        Self { world_position: position, _padding: 0, color }
+        Self { world_position: position, _pad0: 0, color, _pad1: 0 }
     }
 }
 
@@ -70,54 +69,26 @@ struct InstanceRaw {
     world_normal_from_local_normal: [[f32; 3]; 3],
 }
 
-impl model::Vertex for InstanceRaw {
+impl Vertex for InstanceRaw {
     fn desc<'a>() -> wgpu::VertexBufferLayout<'a> {
+        const ATTRIBS: [wgpu::VertexAttribute; 7] = wgpu::vertex_attr_array![
+            // @Note: a mat4 takes up 4 vertex slots as it is technically equivalent
+            // to four vec4's... we will need to reassemble it in the shader then.
+            // @Note: we start at slot 5 since `ModelVertex`'s desc() uses 0 to 4.
+            5 => Float32x4, // world_from_local: [[f32; 4]; 4],
+            6 => Float32x4, // ^
+            7 => Float32x4, // ^
+            8 => Float32x4, // ^
+            // @Note: just like mat4 above, we represent a mat3 using three vec3's.
+            9 => Float32x3, // world_normal_from_local_normal: [[f32; 3]; 3],
+            10 => Float32x3, // ^
+            11 => Float32x3, // ^
+        ];
+
         wgpu::VertexBufferLayout {
             array_stride: std::mem::size_of::<InstanceRaw>() as wgpu::BufferAddress,
             step_mode: wgpu::VertexStepMode::Instance,
-            attributes: &[
-                // world_from_local: [[f32; 4]; 4],
-                // @Note: a mat4 takes up 4 vertex slots as it is technically equivalent
-                // to four vec4's... we will need to reassemble it in the shader then.
-                // @Note: we start at slot 5 since `ModelVertex`'s desc() uses 0 to 4.
-                wgpu::VertexAttribute {
-                    format: wgpu::VertexFormat::Float32x4,
-                    offset: 0,
-                    shader_location: 5,
-                },
-                wgpu::VertexAttribute {
-                    format: wgpu::VertexFormat::Float32x4,
-                    offset: std::mem::size_of::<[f32; 4]>() as wgpu::BufferAddress,
-                    shader_location: 6,
-                },
-                wgpu::VertexAttribute {
-                    format: wgpu::VertexFormat::Float32x4,
-                    offset: std::mem::size_of::<[f32; 4 * 2]>() as wgpu::BufferAddress,
-                    shader_location: 7,
-                },
-                wgpu::VertexAttribute {
-                    format: wgpu::VertexFormat::Float32x4,
-                    offset: std::mem::size_of::<[f32; 4 * 3]>() as wgpu::BufferAddress,
-                    shader_location: 8,
-                },
-                // world_normal_from_local_normal: [[f32; 3]; 3],
-                // @Note: just like mat4 above, we represent a mat3 using three vec3's.
-                wgpu::VertexAttribute {
-                    format: wgpu::VertexFormat::Float32x3,
-                    offset: std::mem::size_of::<[f32; 4 * 4]>() as wgpu::BufferAddress,
-                    shader_location: 9,
-                },
-                wgpu::VertexAttribute {
-                    format: wgpu::VertexFormat::Float32x3,
-                    offset: std::mem::size_of::<[f32; 4 * 4 + 3]>() as wgpu::BufferAddress,
-                    shader_location: 10,
-                },
-                wgpu::VertexAttribute {
-                    format: wgpu::VertexFormat::Float32x3,
-                    offset: std::mem::size_of::<[f32; 4 * 4 + 3 * 2]>() as wgpu::BufferAddress,
-                    shader_location: 11,
-                },
-            ],
+            attributes: &ATTRIBS,
         }
     }
 }
@@ -166,35 +137,33 @@ fn create_render_pipeline(
     depth_format: Option<wgpu::TextureFormat>,
     vertex_buffers_layouts: &[wgpu::VertexBufferLayout],
 ) -> wgpu::RenderPipeline {
-    let shader = device.create_shader_module(&shader_desc);
+    let shader = device.create_shader_module(shader_desc);
 
     device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
         label: Some("render_pipeline"),
         layout: Some(layout),
         vertex: wgpu::VertexState {
             module: &shader,
-            entry_point: "main",
+            entry_point: "vs_main",
             buffers: vertex_buffers_layouts,
         },
         fragment: Some(wgpu::FragmentState {
             module: &shader,
-            entry_point: "main",
-            targets: &[wgpu::ColorTargetState {
+            entry_point: "fs_main",
+            targets: &[Some(wgpu::ColorTargetState {
                 format: color_format,
                 blend: Some(wgpu::BlendState::REPLACE),
                 write_mask: wgpu::ColorWrites::ALL,
-            }],
+            })],
         }),
         primitive: wgpu::PrimitiveState {
             topology: wgpu::PrimitiveTopology::TriangleList,
             strip_index_format: None,
             front_face: wgpu::FrontFace::Ccw,
             cull_mode: Some(wgpu::Face::Back),
-            // Requires Features::DEPTH_CLAMPING to be set to true.
-            clamp_depth: false,
-            // Requires Features::NON_FILL_POLYGON_MODE if not set to Fill.
+            // @Note: changing any of the 3 fields below requires support for specific `Features`.
+            unclipped_depth: false,
             polygon_mode: wgpu::PolygonMode::Fill,
-            // Requires Features::CONSERVATIVE_RASTERIZATION to be set to true.
             conservative: false,
         },
         depth_stencil: depth_format.map(|format| wgpu::DepthStencilState {
@@ -209,6 +178,7 @@ fn create_render_pipeline(
             mask: !0, // enables all samples
             alpha_to_coverage_enabled: false,
         },
+        multiview: None,
     })
 }
 
@@ -239,6 +209,7 @@ impl State {
             .request_adapter(&wgpu::RequestAdapterOptions {
                 power_preference: wgpu::PowerPreference::default(),
                 compatible_surface: Some(&surface),
+                force_fallback_adapter: false,
             })
             .await
             .unwrap();
@@ -248,10 +219,10 @@ impl State {
 
         let config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            format: surface.get_preferred_format(&adapter).unwrap(),
+            format: surface.get_supported_formats(&adapter)[0],
             width: physical_size.width,
             height: physical_size.height,
-            present_mode: wgpu::PresentMode::Fifo,
+            present_mode: wgpu::PresentMode::AutoVsync,
         };
 
         surface.configure(&device, &config);
@@ -278,13 +249,8 @@ impl State {
                     wgpu::BindGroupLayoutEntry {
                         binding: 1,
                         visibility: wgpu::ShaderStages::FRAGMENT,
-                        ty: wgpu::BindingType::Sampler {
-                            // @Volatile: must be true if the `sample_type` of the texture is:
-                            // `TextureSampleType::Float { filterable: true }`, as it is above.
-                            filtering: true,
-                            // @Note: this is only for `TextureSampleType::Depth`.
-                            comparison: false,
-                        },
+                        // @Volatile: should match above Texture's `sample_type.filterable`.
+                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                         count: None,
                     },
                     // Normal map texture:
@@ -301,7 +267,8 @@ impl State {
                     wgpu::BindGroupLayoutEntry {
                         binding: 3,
                         visibility: wgpu::ShaderStages::FRAGMENT,
-                        ty: wgpu::BindingType::Sampler { filtering: true, comparison: false },
+                        // @Volatile: ditto.
+                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                         count: None,
                     },
                 ],
@@ -316,7 +283,7 @@ impl State {
             target: (0.0, 0.0, 0.0).into(),
             up: Vector3::unit_y(),
             aspect: config.width as f32 / config.height as f32,
-            y_fov: cgmath::Deg(45.0),
+            y_fov: Deg(45.0),
             z_near: 0.1,
             z_far: 100.0,
         };
@@ -405,10 +372,7 @@ impl State {
         let light_render_pipeline = create_render_pipeline(
             &device,
             &light_render_pipeline_layout,
-            wgpu::ShaderModuleDescriptor {
-                label: Some("light.wgsl"),
-                source: wgpu::ShaderSource::Wgsl(include_str!("light.wgsl").into()),
-            },
+            include_wgsl!("light.wgsl"),
             config.format,
             Some(texture::Texture::DEPTH_FORMAT),
             &[model::ModelVertex::desc()],
@@ -429,10 +393,7 @@ impl State {
         let render_pipeline = create_render_pipeline(
             &device,
             &render_pipeline_layout,
-            wgpu::ShaderModuleDescriptor {
-                label: Some("shader.wgsl"),
-                source: wgpu::ShaderSource::Wgsl(include_str!("shader.wgsl").into()),
-            },
+            include_wgsl!("shader.wgsl"),
             config.format,
             Some(texture::Texture::DEPTH_FORMAT),
             &[model::ModelVertex::desc(), InstanceRaw::desc()],
@@ -455,9 +416,9 @@ impl State {
                     };
 
                     let rotation = if position.is_zero() {
-                        Quaternion::from_axis_angle(Vector3::unit_z(), cgmath::Deg(0.0))
+                        Quaternion::from_axis_angle(Vector3::unit_z(), Deg(0.0))
                     } else {
-                        Quaternion::from_axis_angle(position.normalize(), cgmath::Deg(45.0))
+                        Quaternion::from_axis_angle(position.normalize(), Deg(45.0))
                     };
 
                     Instance { position, rotation }
@@ -572,23 +533,13 @@ impl State {
         );
 
         let old_position = Vector3::from(self.light_uniform.world_position);
-        let new_position =
-            Quaternion::from_axis_angle(Vector3::unit_y(), cgmath::Deg(1.0)) * old_position;
+        let new_position = Quaternion::from_axis_angle(Vector3::unit_y(), Deg(1.0)) * old_position;
         self.light_uniform.world_position = new_position.into();
         self.queue.write_buffer(&self.light_buffer, 0, bytemuck::cast_slice(&[self.light_uniform]));
     }
 
     fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
-        // @Fixme: doing this in one go doesn't work (why?):
-        //  |
-        //  |   let view = self
-        //  |       .surface
-        //  |       .get_current_frame()?
-        //  |       .output
-        //  |       .texture
-        //  |       .create_view(&wgpu::TextureViewDescriptor::default());
-        //
-        let output = self.surface.get_current_frame()?.output;
+        let output = self.surface.get_current_texture()?;
         let view = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
 
         let mut encoder = self
@@ -597,11 +548,11 @@ impl State {
 
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("render_pass"),
-            color_attachments: &[wgpu::RenderPassColorAttachment {
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                 view: &view,
                 resolve_target: None,
                 ops: wgpu::Operations { load: wgpu::LoadOp::Clear(self.clear_color), store: true },
-            }],
+            })],
             depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
                 view: &self.depth_texture.view,
                 depth_ops: Some(wgpu::Operations { load: wgpu::LoadOp::Clear(1.0), store: true }),
@@ -664,14 +615,14 @@ fn main() {
 
     event_loop.run(move |event, _, control_flow| {
         match event {
-            Event::RedrawRequested(_) => {
+            Event::RedrawRequested(window_id) if window_id == window.id() => {
                 state.update();
                 match state.render() {
                     Ok(_) => {}
-                    Err(wgpu::SurfaceError::Lost) => state.resize(state.physical_size),
                     Err(wgpu::SurfaceError::OutOfMemory) => *control_flow = ControlFlow::Exit,
-                    // Other errors (Timeout and Outdated) should be resolved by the next frame.
-                    Err(e) => eprintln!("{:?}", e),
+                    Err(wgpu::SurfaceError::Timeout) => eprintln!("Surface timeout"),
+                    // Reconfigure the surface if Lost or Outdated.
+                    Err(_) => state.resize(state.physical_size),
                 }
             }
             Event::MainEventsCleared => {

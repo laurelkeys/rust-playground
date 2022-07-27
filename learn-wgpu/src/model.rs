@@ -1,6 +1,7 @@
-use anyhow::*;
-use cgmath::{InnerSpace, Vector2, Vector3, Zero};
 use std::{ops::Range, path::Path};
+
+use anyhow::Context;
+use cgmath::{InnerSpace, Vector2, Vector3, Zero};
 use wgpu::util::DeviceExt;
 
 use crate::texture;
@@ -17,50 +18,27 @@ pub trait Vertex {
 #[repr(C)]
 #[derive(Clone, Copy, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct ModelVertex {
-    position: [f32; 3],
-    texcoord: [f32; 2],
-    normal: [f32; 3],
-    tangent: [f32; 3],
-    bitangent: [f32; 3],
+    pub position: [f32; 3],
+    pub texcoord: [f32; 2],
+    pub normal: [f32; 3],
+    pub tangent: [f32; 3],
+    pub bitangent: [f32; 3],
 }
 
 impl Vertex for ModelVertex {
     fn desc<'a>() -> wgpu::VertexBufferLayout<'a> {
+        const ATTRIBS: [wgpu::VertexAttribute; 5] = wgpu::vertex_attr_array![
+            0 => Float32x3, // position: [f32; 3],
+            1 => Float32x2, // texcoord: [f32; 2],
+            2 => Float32x3, // normal: [f32; 3],
+            3 => Float32x3, // tangent: [f32; 3],
+            4 => Float32x3, // bitangent: [f32; 3],
+        ];
+
         wgpu::VertexBufferLayout {
             array_stride: std::mem::size_of::<ModelVertex>() as wgpu::BufferAddress,
             step_mode: wgpu::VertexStepMode::Vertex,
-            attributes: &[
-                // position: [f32; 3],
-                wgpu::VertexAttribute {
-                    format: wgpu::VertexFormat::Float32x3,
-                    offset: 0,
-                    shader_location: 0,
-                },
-                // texcoord: [f32; 2],
-                wgpu::VertexAttribute {
-                    format: wgpu::VertexFormat::Float32x2,
-                    offset: std::mem::size_of::<[f32; 3]>() as wgpu::BufferAddress,
-                    shader_location: 1,
-                },
-                // normal: [f32; 3],
-                wgpu::VertexAttribute {
-                    format: wgpu::VertexFormat::Float32x3,
-                    offset: std::mem::size_of::<[f32; 5]>() as wgpu::BufferAddress,
-                    shader_location: 2,
-                },
-                // tangent: [f32; 3],
-                wgpu::VertexAttribute {
-                    format: wgpu::VertexFormat::Float32x3,
-                    offset: std::mem::size_of::<[f32; 8]>() as wgpu::BufferAddress,
-                    shader_location: 3,
-                },
-                // bitangent: [f32; 3],
-                wgpu::VertexAttribute {
-                    format: wgpu::VertexFormat::Float32x3,
-                    offset: std::mem::size_of::<[f32; 11]>() as wgpu::BufferAddress,
-                    shader_location: 4,
-                },
-            ],
+            attributes: &ATTRIBS,
         }
     }
 }
@@ -140,7 +118,7 @@ impl Model {
         queue: &wgpu::Queue,
         layout: &wgpu::BindGroupLayout,
         path: P,
-    ) -> Result<Self>
+    ) -> anyhow::Result<Self>
     where
         P: AsRef<Path>,
     {
@@ -178,7 +156,7 @@ impl Model {
 
                 Ok(Material::new(device, layout, &material.name, diffuse_texture, normal_texture))
             })
-            .collect::<Result<Vec<Material>>>()?;
+            .collect::<anyhow::Result<Vec<Material>>>()?;
 
         let meshes = obj_models
             .into_iter()
@@ -205,7 +183,7 @@ impl Model {
                     material_index: model.mesh.material_id.unwrap_or(0),
                 })
             })
-            .collect::<Result<Vec<Mesh>>>()?;
+            .collect::<anyhow::Result<Vec<Mesh>>>()?;
 
         Ok(Self { meshes, materials })
     }
@@ -331,9 +309,9 @@ pub trait DrawModel<'a> {
     );
 }
 
-impl<'renderpass, 'a> DrawModel<'a> for wgpu::RenderPass<'renderpass>
+impl<'render_pass, 'a> DrawModel<'a> for wgpu::RenderPass<'render_pass>
 where
-    'a: 'renderpass,
+    'a: 'render_pass,
 {
     fn draw_mesh(
         &mut self,
@@ -446,9 +424,9 @@ pub trait DrawLight<'a> {
     );
 }
 
-impl<'renderpass, 'a> DrawLight<'a> for wgpu::RenderPass<'renderpass>
+impl<'render_pass, 'a> DrawLight<'a> for wgpu::RenderPass<'render_pass>
 where
-    'a: 'renderpass,
+    'a: 'render_pass,
 {
     fn draw_light_mesh(
         &mut self,

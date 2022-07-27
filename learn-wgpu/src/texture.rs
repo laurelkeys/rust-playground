@@ -1,6 +1,6 @@
-use anyhow::*;
-use image::GenericImageView;
 use std::path::Path;
+
+use image::GenericImageView;
 
 //
 // Texture
@@ -74,7 +74,7 @@ impl Texture {
         bytes: &[u8],
         label: Option<&str>,
         srgb: TextureIsSrgb,
-    ) -> Result<Self> {
+    ) -> anyhow::Result<Self> {
         let image = image::load_from_memory(bytes)?;
         Self::from_image(device, queue, &image, label, srgb)
     }
@@ -85,7 +85,7 @@ impl Texture {
         image: &image::DynamicImage,
         label: Option<&str>,
         srgb: TextureIsSrgb,
-    ) -> Result<Self> {
+    ) -> anyhow::Result<Self> {
         let (width, height) = image.dimensions();
         anyhow::ensure!(width > 0 && height > 0);
 
@@ -140,7 +140,7 @@ impl Texture {
         queue: &wgpu::Queue,
         path: P,
         srgb: TextureIsSrgb,
-    ) -> Result<Self>
+    ) -> anyhow::Result<Self>
     where
         P: AsRef<Path>,
     {
