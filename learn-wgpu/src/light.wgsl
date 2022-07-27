@@ -1,37 +1,37 @@
+// @Volatile: sync this with `CameraUniform` from main.rs.
+struct CameraUniform {
+    world_position: vec4<f32>,
+    clip_from_world: mat4x4<f32>,
+}
+
+struct LightUniform {
+    world_position: vec3<f32>,
+    color: vec3<f32>,
+}
+
+struct VertexInput {
+    @location(0) position: vec3<f32>,
+}
+
+struct VertexOutput {
+    @builtin(position) clip_position: vec4<f32>,
+    @location(0) color: vec3<f32>,
+}
+
+//
+// Resource bindings
+//
+
+@group(0) @binding(0) var<uniform> camera: CameraUniform;
+
+@group(1) @binding(0) var<uniform> light: LightUniform;
+
 //
 // Vertex shader
 //
 
-// @Volatile: sync this with `CameraUniform` from main.rs.
-[[block]]
-struct CameraUniform {
-    world_position: vec4<f32>;
-    clip_from_world: mat4x4<f32>;
-};
-
-[[group(0), binding(0)]]
-var<uniform> camera: CameraUniform;
-
-[[block]]
-struct LightUniform {
-    world_position: vec3<f32>;
-    color: vec3<f32>;
-};
-
-[[group(1), binding(0)]]
-var<uniform> light: LightUniform;
-
-struct VertexInput {
-    [[location(0)]] position: vec3<f32>;
-};
-
-struct VertexOutput {
-    [[builtin(position)]] clip_position: vec4<f32>;
-    [[location(0)]] color: vec3<f32>;
-};
-
-[[stage(vertex)]]
-fn main(
+@vertex
+fn vs_main(
     model: VertexInput,
 ) -> VertexOutput {
     let scale = 0.25;
@@ -47,9 +47,9 @@ fn main(
 // Fragment shader
 //
 
-[[stage(fragment)]]
-fn main(
+@fragment
+fn fs_main(
     in: VertexOutput
-) -> [[location(0)]] vec4<f32> {
+) -> @location(0) vec4<f32> {
     return vec4<f32>(in.color, 1.0);
 }

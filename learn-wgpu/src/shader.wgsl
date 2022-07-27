@@ -1,57 +1,59 @@
+// @Volatile: sync this with `CameraUniform` from main.rs.
+struct CameraUniform {
+    world_position: vec4<f32>,
+    clip_from_world: mat4x4<f32>,
+}
+
+struct LightUniform {
+    world_position: vec3<f32>,
+    color: vec3<f32>,
+}
+
+struct InstanceInput {
+    @location(5) world_from_local_0: vec4<f32>,
+    @location(6) world_from_local_1: vec4<f32>,
+    @location(7) world_from_local_2: vec4<f32>,
+    @location(8) world_from_local_3: vec4<f32>,
+    @location(9) world_normal_from_local_normal_0: vec3<f32>,
+    @location(10) world_normal_from_local_normal_1: vec3<f32>,
+    @location(11) world_normal_from_local_normal_2: vec3<f32>,
+}
+
+struct VertexInput {
+    @location(0) position: vec3<f32>,
+    @location(1) texcoord: vec2<f32>,
+    @location(2) normal: vec3<f32>,
+    @location(3) tangent: vec3<f32>,
+    @location(4) bitangent: vec3<f32>,
+}
+
+struct VertexOutput {
+    @builtin(position) clip_position: vec4<f32>,
+    @location(0) texcoord: vec2<f32>,
+    @location(1) tangent_position: vec3<f32>,
+    @location(2) tangent_view_position: vec3<f32>,
+    @location(3) tangent_light_position: vec3<f32>,
+}
+
+//
+// Resource bindings
+//
+
+@group(0) @binding(0) var t_diffuse: texture_2d<f32>;
+@group(0) @binding(1) var s_diffuse: sampler;
+@group(0) @binding(2) var t_normal: texture_2d<f32>;
+@group(0) @binding(3) var s_normal: sampler;
+
+@group(1) @binding(0) var<uniform> camera: CameraUniform;
+
+@group(2) @binding(0) var<uniform> light: LightUniform;
+
 //
 // Vertex shader
 //
 
-// @Note: any structure used as a `uniform` must be annotated
-// with `[[block]]`, as: `var<uniform> camera: CameraUniform`.
-
-// @Volatile: sync this with `CameraUniform` from main.rs.
-[[block]]
-struct CameraUniform {
-    world_position: vec4<f32>;
-    clip_from_world: mat4x4<f32>;
-};
-
-[[group(1), binding(0)]]
-var<uniform> camera: CameraUniform;
-
-[[block]]
-struct LightUniform {
-    world_position: vec3<f32>;
-    color: vec3<f32>;
-};
-
-[[group(2), binding(0)]]
-var<uniform> light: LightUniform;
-
-struct InstanceInput {
-    [[location(5)]] world_from_local_0: vec4<f32>;
-    [[location(6)]] world_from_local_1: vec4<f32>;
-    [[location(7)]] world_from_local_2: vec4<f32>;
-    [[location(8)]] world_from_local_3: vec4<f32>;
-    [[location(9)]] world_normal_from_local_normal_0: vec3<f32>;
-    [[location(10)]] world_normal_from_local_normal_1: vec3<f32>;
-    [[location(11)]] world_normal_from_local_normal_2: vec3<f32>;
-};
-
-struct VertexInput {
-    [[location(0)]] position: vec3<f32>;
-    [[location(1)]] texcoord: vec2<f32>;
-    [[location(2)]] normal: vec3<f32>;
-    [[location(3)]] tangent: vec3<f32>;
-    [[location(4)]] bitangent: vec3<f32>;
-};
-
-struct VertexOutput {
-    [[builtin(position)]] clip_position: vec4<f32>; // @Note: analogous to gl_Position
-    [[location(0)]] texcoord: vec2<f32>;
-    [[location(1)]] tangent_position: vec3<f32>;
-    [[location(2)]] tangent_view_position: vec3<f32>;
-    [[location(3)]] tangent_light_position: vec3<f32>;
-};
-
-[[stage(vertex)]]
-fn main(
+@vertex
+fn vs_main(
     model: VertexInput,
     instance: InstanceInput,
 ) -> VertexOutput {
@@ -95,20 +97,10 @@ fn main(
 // Fragment shader
 //
 
-[[group(0), binding(0)]]
-var t_diffuse: texture_2d<f32>;
-[[group(0), binding(1)]]
-var s_diffuse: sampler;
-
-[[group(0), binding(2)]]
-var t_normal: texture_2d<f32>;
-[[group(0), binding(3)]]
-var s_normal: sampler;
-
-[[stage(fragment)]]
-fn main(
+@fragment
+fn fs_main(
     in: VertexOutput
-) -> [[location(0)]] vec4<f32> {
+) -> @location(0) vec4<f32> {
     let view_dir = normalize(in.tangent_view_position - in.tangent_position); // normalize(camera.world_position.xyz - in.world_position);
     let light_dir = normalize(in.tangent_light_position - in.tangent_position); // normalize(light.world_position - in.world_position);
     let hafway_dir = normalize(view_dir + light_dir); // Blinn-Phong
