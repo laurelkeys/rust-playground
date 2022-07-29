@@ -10,17 +10,62 @@ use winit::{
     window::{Window, WindowBuilder},
 };
 
+mod assets;
 mod camera;
 mod model;
 mod texture;
 
-use crate::camera::{Camera, CameraController, CameraUniform};
+use crate::camera::{Camera, CameraController};
 use crate::model::{DrawLight, DrawModel, Vertex};
+
+/// Maps z coordinate values from `-1.0..=1.0` to `0.0..=1.0`.
+pub const OPENGL_TO_WGPU_MATRIX: Matrix4<f32> = Matrix4::new(
+    1.0, 0.0, 0.0, 0.0, // 1st column
+    0.0, 1.0, 0.0, 0.0, // 2nd column
+    0.0, 0.0, 0.5, 0.0, // 3rd column
+    0.0, 0.0, 0.5, 1.0, // 4th column
+);
+
+//
+// CameraUniform
+//
+
+// @Volatile: keep shader.wgsl and light.wgsl synced with this.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+pub struct CameraUniform {
+    /// Camera position in "world space" coordinates.
+    // @Note: store 4 floats because of uniforms' 16 byte spacing requirement.
+    world_position: [f32; 4],
+    /// Combined view ("world to view") and projection ("view to clip") matrix.
+    // @Note: we can't use cgmath directly with bytemuck, so we convert Matrix4.
+    clip_from_world: [[f32; 4]; 4],
+}
+
+impl CameraUniform {
+    pub fn new(world_position: [f32; 4]) -> Self {
+        use cgmath::SquareMatrix;
+
+        Self { world_position, clip_from_world: Matrix4::identity().into() }
+    }
+
+    /// Updates the combined "view projection" matrix uniform, which
+    /// is used to transform world coordinates into clip coordinates.
+    pub fn update_clip_from_world(&mut self, camera: &Camera) {
+        self.world_position = camera.eye.to_homogeneous().into();
+        // @Note: Wgpu's coordinate system uses NDC with the x- and y-axis in the range
+        // [-1.0, 1.0], but with the z-axis ranging from 0.0 to 1.0. However, cgmath
+        // uses the same convention as OpenGL (with z in [-1.0, 1.0] as well).
+        self.clip_from_world =
+            (OPENGL_TO_WGPU_MATRIX * camera.build_view_projection_matrix()).into();
+    }
+}
 
 //
 // LightUniform
 //
 
+// @Volatile: keep shader.wgsl and light.wgsl synced with this.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 struct LightUniform {
@@ -49,9 +94,12 @@ impl Instance {
     fn to_raw(&self) -> InstanceRaw {
         let rotation = Matrix4::from(self.rotation);
         let world_from_local = (Matrix4::from_translation(self.position) * rotation).into();
-
-        // @Todo: "truncate" rotation from a Matrix4 to a Matrix3, avoiding recomputation.
-        let world_normal_from_local_normal = Matrix3::from(self.rotation).into();
+        let world_normal_from_local_normal = Matrix3::from_cols(
+            rotation.x.truncate(), // 1st column
+            rotation.y.truncate(), // 2nd column
+            rotation.z.truncate(), // 3rd column
+        )
+        .into();
 
         InstanceRaw { world_from_local, world_normal_from_local_normal }
     }
@@ -249,7 +297,7 @@ impl State {
                     wgpu::BindGroupLayoutEntry {
                         binding: 1,
                         visibility: wgpu::ShaderStages::FRAGMENT,
-                        // @Volatile: should match above Texture's `sample_type.filterable`.
+                        // @Note: should match the above Texture's `sample_type.filterable`.
                         ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                         count: None,
                     },
@@ -267,7 +315,7 @@ impl State {
                     wgpu::BindGroupLayoutEntry {
                         binding: 3,
                         visibility: wgpu::ShaderStages::FRAGMENT,
-                        // @Volatile: ditto.
+                        // @Note: ditto.
                         ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                         count: None,
                     },
@@ -288,7 +336,7 @@ impl State {
             z_far: 100.0,
         };
 
-        let mut camera_uniform = CameraUniform::new();
+        let mut camera_uniform = CameraUniform::new([0.0; 4]);
         camera_uniform.update_clip_from_world(&camera);
 
         let camera_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -432,31 +480,33 @@ impl State {
             usage: wgpu::BufferUsages::VERTEX,
         });
 
-        let assets_dir = Path::new(env!("OUT_DIR")).join("assets");
-        let cube_model_dir = assets_dir.join("models").join("cube");
+        let cube_dir = Path::new("models").join("cube");
+        let cube_obj_path = cube_dir.join("cube.obj");
+        let cobble_diffuse_png_path = cube_dir.join("cobble-diffuse.png");
+        let cobble_normal_png_path = cube_dir.join("cobble-normal.png");
 
-        let cube_model = model::Model::load(
+        let cube_model = assets::load_model(
+            cube_obj_path.into_os_string().to_str().unwrap(),
             &device,
             &queue,
             &texture_bind_group_layout,
-            cube_model_dir.join("cube.obj"),
         )
         .unwrap();
 
         let debug_material = {
-            let diffuse_texture = texture::Texture::load(
+            let diffuse_texture = assets::load_texture(
+                cobble_diffuse_png_path.into_os_string().to_str().unwrap(),
+                texture::TextureIsSrgb::Encoded,
                 &device,
                 &queue,
-                cube_model_dir.join("cobble-diffuse.png"),
-                texture::TextureIsSrgb::Encoded,
             )
             .unwrap();
 
-            let normal_texture = texture::Texture::load(
+            let normal_texture = assets::load_texture(
+                cobble_normal_png_path.into_os_string().to_str().unwrap(),
+                texture::TextureIsSrgb::Linear,
                 &device,
                 &queue,
-                cube_model_dir.join("cobble-normal.png"),
-                texture::TextureIsSrgb::Linear,
             )
             .unwrap();
 
@@ -606,29 +656,36 @@ impl State {
 //
 
 fn main() {
+    pollster::block_on(run());
+}
+
+async fn run() {
     env_logger::init();
     let event_loop = EventLoop::new();
-    let window = WindowBuilder::new().build(&event_loop).unwrap();
+    let window =
+        WindowBuilder::new().with_title(env!("CARGO_PKG_NAME")).build(&event_loop).unwrap();
 
-    // @Note: since main() can't be async, we need to block:
-    let mut state = pollster::block_on(State::new(&window));
+    let mut state = State::new(&window).await;
 
     event_loop.run(move |event, _, control_flow| {
         match event {
+            Event::MainEventsCleared => {
+                // RedrawRequested will only trigger once, unless we manually request it.
+                window.request_redraw();
+            }
+
             Event::RedrawRequested(window_id) if window_id == window.id() => {
                 state.update();
                 match state.render() {
                     Ok(_) => {}
                     Err(wgpu::SurfaceError::OutOfMemory) => *control_flow = ControlFlow::Exit,
                     Err(wgpu::SurfaceError::Timeout) => eprintln!("Surface timeout"),
-                    // Reconfigure the surface if Lost or Outdated.
-                    Err(_) => state.resize(state.physical_size),
+                    Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) => {
+                        state.resize(state.physical_size)
+                    }
                 }
             }
-            Event::MainEventsCleared => {
-                // RedrawRequested will only trigger once, unless we manually request it.
-                window.request_redraw();
-            }
+
             Event::WindowEvent { ref event, window_id }
                 if window_id == window.id() && !state.input(event) =>
             {
@@ -636,8 +693,7 @@ fn main() {
                     //
                     // Window close events
                     //
-                    WindowEvent::CloseRequested
-                    | WindowEvent::KeyboardInput {
+                    WindowEvent::KeyboardInput {
                         input:
                             KeyboardInput {
                                 state: ElementState::Pressed,
@@ -645,7 +701,8 @@ fn main() {
                                 ..
                             },
                         ..
-                    } => *control_flow = ControlFlow::Exit,
+                    }
+                    | WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
 
                     //
                     // Window resize events
@@ -660,7 +717,8 @@ fn main() {
                     _ => {}
                 }
             }
-            _ => (),
+
+            _ => {}
         }
     });
 }

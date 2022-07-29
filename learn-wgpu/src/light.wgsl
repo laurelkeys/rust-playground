@@ -1,12 +1,15 @@
-// @Volatile: sync this with `CameraUniform` from main.rs.
+// @Volatile: sync with `CameraUniform` from main.rs.
 struct CameraUniform {
     world_position: vec4<f32>,
     clip_from_world: mat4x4<f32>,
 }
 
+// @Volatile: sync with `LightUniform` from main.rs.
 struct LightUniform {
     world_position: vec3<f32>,
+    // _pad0: u32,
     color: vec3<f32>,
+    // _pad1: u32,
 }
 
 struct VertexInput {

@@ -1,5 +1,3 @@
-use std::path::Path;
-
 use image::GenericImageView;
 
 //
@@ -73,10 +71,10 @@ impl Texture {
         queue: &wgpu::Queue,
         bytes: &[u8],
         label: Option<&str>,
-        srgb: TextureIsSrgb,
+        is_srgb: TextureIsSrgb,
     ) -> anyhow::Result<Self> {
         let image = image::load_from_memory(bytes)?;
-        Self::from_image(device, queue, &image, label, srgb)
+        Self::from_image(device, queue, &image, label, is_srgb)
     }
 
     pub fn from_image(
@@ -84,7 +82,7 @@ impl Texture {
         queue: &wgpu::Queue,
         image: &image::DynamicImage,
         label: Option<&str>,
-        srgb: TextureIsSrgb,
+        is_srgb: TextureIsSrgb,
     ) -> anyhow::Result<Self> {
         let (width, height) = image.dimensions();
         anyhow::ensure!(width > 0 && height > 0);
@@ -97,7 +95,7 @@ impl Texture {
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
-            format: match srgb {
+            format: match is_srgb {
                 TextureIsSrgb::Linear => wgpu::TextureFormat::Rgba8Unorm,
                 TextureIsSrgb::Encoded => wgpu::TextureFormat::Rgba8UnormSrgb,
             },
@@ -133,19 +131,5 @@ impl Texture {
         });
 
         Ok(Self { texture, view, sampler })
-    }
-
-    pub fn load<P>(
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
-        path: P,
-        srgb: TextureIsSrgb,
-    ) -> anyhow::Result<Self>
-    where
-        P: AsRef<Path>,
-    {
-        let image = image::open(&path)?;
-        let label = path.as_ref().to_str();
-        Self::from_image(device, queue, &image, label, srgb)
     }
 }

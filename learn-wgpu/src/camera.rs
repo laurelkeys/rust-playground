@@ -19,14 +19,6 @@ pub struct Camera {
     pub z_far: f32,
 }
 
-/// Maps z coordinate values from `-1.0..=1.0` to `0.0..=1.0`.
-pub const OPENGL_TO_WGPU_MATRIX: Matrix4<f32> = Matrix4::new(
-    1.0, 0.0, 0.0, 0.0, // 1st column
-    0.0, 1.0, 0.0, 0.0, // 2nd column
-    0.0, 0.0, 0.5, 0.0, // 3rd column
-    0.0, 0.0, 0.5, 1.0, // 4th column
-);
-
 impl Camera {
     /// Returns a matrix that transforms world coordinates to clip coordinates, e.g.:
     /// ```
@@ -38,41 +30,6 @@ impl Camera {
         let view_from_world = Matrix4::look_at_rh(self.eye, self.target, self.up);
         let clip_from_view = cgmath::perspective(self.y_fov, self.aspect, self.z_near, self.z_far);
         clip_from_view * view_from_world
-    }
-}
-
-//
-// CameraUniform
-//
-
-// @Volatile: keep shader.wgsl and light.wgsl synced with this.
-#[repr(C)]
-#[derive(Clone, Copy, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-pub struct CameraUniform {
-    /// Camera position in "world space" coordinates.
-    // @Note: store 4 floats because of uniforms' 16 byte spacing requirement.
-    world_position: [f32; 4],
-    /// Combined view ("world to view") and projection ("view to clip") matrix.
-    // @Note: we can't use cgmath directly with bytemuck, so we convert Matrix4.
-    clip_from_world: [[f32; 4]; 4],
-}
-
-impl CameraUniform {
-    pub fn new() -> Self {
-        use cgmath::SquareMatrix;
-
-        Self { world_position: [0.0; 4], clip_from_world: Matrix4::identity().into() }
-    }
-
-    /// Updates the combined "view projection" matrix uniform, which
-    /// is used to transform world coordinates into clip coordinates.
-    pub fn update_clip_from_world(&mut self, camera: &Camera) {
-        self.world_position = camera.eye.to_homogeneous().into();
-        // @Note: Wgpu's coordinate system uses NDC with the x- and y-axis in the range
-        // [-1.0, 1.0], but with the z-axis ranging from 0.0 to 1.0. However, cgmath
-        // uses the same convention as OpenGL (with z in [-1.0, 1.0] as well).
-        self.clip_from_world =
-            (OPENGL_TO_WGPU_MATRIX * camera.build_view_projection_matrix()).into();
     }
 }
 

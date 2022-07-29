@@ -1,12 +1,15 @@
-// @Volatile: sync this with `CameraUniform` from main.rs.
+// @Volatile: sync with `CameraUniform` from main.rs.
 struct CameraUniform {
     world_position: vec4<f32>,
     clip_from_world: mat4x4<f32>,
 }
 
+// @Volatile: sync with `LightUniform` from main.rs.
 struct LightUniform {
     world_position: vec3<f32>,
+    // _pad0: u32,
     color: vec3<f32>,
+    // _pad1: u32,
 }
 
 struct InstanceInput {
@@ -61,13 +64,13 @@ fn vs_main(
         instance.world_from_local_0,
         instance.world_from_local_1,
         instance.world_from_local_2,
-        instance.world_from_local_3
+        instance.world_from_local_3,
     );
 
     let world_normal_from_local_normal = mat3x3<f32>(
         instance.world_normal_from_local_normal_0,
         instance.world_normal_from_local_normal_1,
-        instance.world_normal_from_local_normal_2
+        instance.world_normal_from_local_normal_2,
     );
 
     // @Robustness: at the moment, everything is being computed in world space
@@ -79,9 +82,9 @@ fn vs_main(
 
     // Assemble the "TBN matrix", used to transforms vectors to tangent space.
     let tangent_from_world = transpose(mat3x3<f32>(
-        normalize(world_tangent), // world_tangent,
-        normalize(world_bitangent), // world_bitangent,
-        normalize(world_normal), // world_normal,
+        normalize(world_tangent),
+        normalize(world_bitangent),
+        normalize(world_normal),
     ));
 
     var out: VertexOutput;
